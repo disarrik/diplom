@@ -1,4 +1,4 @@
-package observability.common.model.event
+package observability.common.model
 
 enum class LineageType{
     REWRITE,

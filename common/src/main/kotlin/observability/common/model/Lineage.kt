@@ -1,8 +1,9 @@
-package observability.common.model.event
+package observability.common.model
 
-import observability.common.model.StorageEntity
+import java.util.UUID
 
-data class LineageEvent(
+data class Lineage(
+    val id: UUID,
     val sources: List<StorageEntity>,
     val targets: List<StorageEntity>,
     val lineageType: LineageType,
