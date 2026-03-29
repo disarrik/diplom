@@ -1,5 +1,5 @@
 plugins {
-    id 'org.jetbrains.kotlin.jvm' version '2.3.0'
+    alias(libs.plugins.kotlin.jvm)
 }
 
 group = 'org.example'
@@ -10,6 +10,7 @@ repositories {
 }
 
 dependencies {
+    implementation(project(":common"))
     testImplementation 'org.jetbrains.kotlin:kotlin-test'
 }
 

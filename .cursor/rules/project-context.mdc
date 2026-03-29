@@ -1,0 +1,42 @@
+---
+description: Architecture and purpose of the data-observability Gradle project
+alwaysApply: true
+---
+
+# Data observability environment
+
+This repository is a **data observability** system: it tracks data assets, lineage, quality signals, and reacts when upstream problems may corrupt downstream consumers.
+
+## Modules (Gradle subprojects)
+
+### `common`
+
+Shared Kotlin library: common types, models, and utilities used by the other modules (e.g. events, stats, storage abstractions).
+
+### `state-storage`
+
+Persistent **graph of the data estate**: tables, column metadata, and **relationships / connections** between entities. This is the source of truth for topology and metadata that the rest of the system reasons about.
+
+### `importer`
+
+Ingestion service that:
+
+- **Polls data sources** for **metrics / statistics**, runs **detection** logic, and when it finds problems it **publishes error events to a message topic**.
+- **Polls lineage providers** (e.g. **Airflow**, **dbt**) and when lineage changes it **publishes lineage updates to the same (or related) topic** so the graph stays aligned with orchestration and transformation tools.
+
+### `processor`
+
+Downstream consumer that:
+
+- **Reads events from the topic** (metric issues, lineage changes, etc.).
+- **Updates `state-storage`** so the graph and metadata reflect the latest world state.
+- When **source data corruption** (or similar upstream failure) is inferred, **opens incidents** for **all affected downstream databases / datasets** that depend on the damaged source—so blast radius is visible and actionable.
+
+## Mental model
+
+```text
+Sources + lineage tools  →  importer  →  topic  →  processor  →  state-storage
+                                                                    ↘ incidents (affected consumers)
+```
+
+When changing code, preserve boundaries: **importer** produces events; **processor** applies them and triggers incident workflows; **state-storage** holds the graph; **common** stays dependency-light and reusable.
