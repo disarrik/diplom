@@ -10,6 +10,6 @@ rootProject.name = "data-observability"
 
 include("common")
 include("state-storage")
-include("importer")
+include("std-importer")
 include("std-processor")
 include("app")

@@ -2,6 +2,6 @@ package observability.common.processor
 
 import observability.common.model.DataIncident
 
-interface IncedentProcessor {
+interface IncidentProcessor {
     fun process(dataIncident: DataIncident)
 }

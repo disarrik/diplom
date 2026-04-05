@@ -17,9 +17,9 @@ Shared Kotlin library: common types, models, and utilities used by the other mod
 
 Persistent **graph of the data estate**: tables, column metadata, and **relationships / connections** between entities. This is the source of truth for topology and metadata that the rest of the system reasons about.
 
-### `importer`
+### `std-importer`
 
-Ingestion service that:
+Reference **importer** implementation. Ingestion service that:
 
 - **Polls data sources** for **metrics / statistics**, runs **detection** logic, and when it finds problems it **publishes error events to a message topic**.
 - **Polls lineage providers** (e.g. **Airflow**, **dbt**) and when lineage changes it **publishes lineage updates to the same (or related) topic** so the graph stays aligned with orchestration and transformation tools.
@@ -35,8 +35,8 @@ Reference **processor** implementation (standard library-style defaults). Downst
 ## Mental model
 
 ```text
-Sources + lineage tools  →  importer  →  topic  →  std-processor  →  state-storage
+Sources + lineage tools  →  std-importer  →  topic  →  std-processor  →  state-storage
                                                                     ↘ incidents (affected consumers)
 ```
 
-When changing code, preserve boundaries: **importer** produces events; **processor** implementations (e.g. **std-processor**) apply them and trigger incident workflows; **state-storage** holds the graph; **common** stays dependency-light and reusable (including processor **interfaces**).
+When changing code, preserve boundaries: **importer** implementations (e.g. **std-importer**) produce events; **processor** implementations (e.g. **std-processor**) apply them and trigger incident workflows; **state-storage** holds the graph; **common** stays dependency-light and reusable (including shared **models** and processor **interfaces**).
