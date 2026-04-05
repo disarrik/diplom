@@ -46,7 +46,9 @@ class UniqueValuesDetector(
     }
 
     private fun queryUniqueCount(): Long {
-        val sql = "SELECT COUNT(DISTINCT $columnName) FROM $tableName"
+        val quotedColumn = quotePgIdentifier(columnName)
+        val quotedTable = quotePgIdentifier(tableName)
+        val sql = "SELECT COUNT(DISTINCT $quotedColumn) FROM $quotedTable"
 
         DriverManager.getConnection(connectionString, /* user extracted from URL */ null, password).use { connection ->
             connection.createStatement().use { statement ->
@@ -57,4 +59,9 @@ class UniqueValuesDetector(
             }
         }
     }
+
+    private fun quotePgIdentifier(qualified: String): String =
+        qualified.split('.').joinToString(".") { segment ->
+            "\"" + segment.replace("\"", "\"\"") + "\""
+        }
 }

@@ -15,6 +15,7 @@ dependencies {
     implementation project(':state-storage')
     implementation project(':std-importer')
     implementation project(':std-processor')
+    implementation 'org.postgresql:postgresql:42.7.3'
 }
 
 application {

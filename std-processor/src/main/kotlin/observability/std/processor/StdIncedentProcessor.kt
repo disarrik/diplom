@@ -11,6 +11,7 @@ class StdIncedentProcessor(
 ) : IncidentProcessor {
     override fun process(dataIncident: DataIncident) {
         val affected = stateService.getChildrenRecursively(dataIncident.data)
+        notifyService.notify(dataIncident.data, dataIncident, false)
         affected.forEach {
             notifyService.notify(it, dataIncident, false)
         }

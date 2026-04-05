@@ -6,7 +6,7 @@ lineageImporters:
 incidentDetectors:
   - className: observability.std.importer.detect.impls.UniqueValuesDetector
     params:
-      connectionString: "jdbc:postgresql://localhost:5432/mydb"
+      connectionString: "jdbc:postgresql://localhost:5432/mydb?user=postgres"
       password: "secret"
       namespace: "default"
       tableName: "order"
