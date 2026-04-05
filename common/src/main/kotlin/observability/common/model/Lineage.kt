@@ -7,5 +7,4 @@ data class Lineage(
     val sources: List<StorageEntity>,
     val targets: List<StorageEntity>,
     val lineageType: LineageType,
-    val unixTimestamp: Long,
 )

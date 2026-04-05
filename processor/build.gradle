@@ -11,7 +11,9 @@ repositories {
 
 dependencies {
     implementation(project(":common"))
+    testImplementation project(":state-storage")
     testImplementation 'org.jetbrains.kotlin:kotlin-test'
+    testImplementation 'io.mockk:mockk:1.13.16'
 }
 
 kotlin {

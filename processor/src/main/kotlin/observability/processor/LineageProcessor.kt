@@ -1,6 +1,6 @@
 package observability.processor
 
-import observability.NotifyService
+import observability.common.notify.NotifyService
 import observability.common.StateService
 import observability.common.model.Lineage
 import observability.common.model.LineageType
@@ -20,9 +20,9 @@ class LineageProcessor(
         lineage.sources.forEach { source ->
             lineage.targets.forEach { target ->
                 stateService.link(source, target)
-                stateService.getChildrenRecursively(target).forEach { children ->
+                (listOf(target) + stateService.getChildrenRecursively(target)).forEach { child ->
                     activeIncidentsOnSources.forEach {
-                        notifyService.notify(children, it, false)
+                        notifyService.notify(child, it, false)
                     }
                 }
             }

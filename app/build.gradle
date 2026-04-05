@@ -1,0 +1,26 @@
+plugins {
+    alias(libs.plugins.kotlin.jvm)
+    id 'application'
+}
+
+group = 'org.example'
+version = 'unspecified'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':common')
+    implementation project(':state-storage')
+    implementation project(':importer')
+    implementation project(':processor')
+}
+
+application {
+    mainClass = 'observability.app.MainKt'
+}
+
+kotlin {
+    jvmToolchain(25)
+}

@@ -1,12 +1,6 @@
-# Data observability
+# Как сделать так, чтобы поддерживался любой порядок эвентов
+Надо в стейте вообще ничего никогда не удалять, вместо этого на всех сущностях добавить поля времени создания и удаления, при обходе и поиске транзитивных источников и инцеденотов надо при обоходе держать в аккумуляоторе дату.
+ПОКА В MVP ЭТОГО НЕ ДЕЛАЮ
 
-Gradle multi-project (`data-observability`) for observing data quality, lineage, and impact when upstream data is bad.
-
-| Module | Role |
-|--------|------|
-| **common** | Shared models and utilities (events, stats, storage-related types). |
-| **state-storage** | Graph store: tables, columns, metadata, and links between entities. |
-| **importer** | Polls DBs for metrics and detects issues → publishes to a topic; polls lineage tools (e.g. Airflow, dbt) → publishes lineage updates to the topic. |
-| **processor** | Consumes the topic, updates state-storage, opens incidents on all downstream assets affected by source-side corruption. |
-
-For AI-assisted work in Cursor, see `.cursor/rules/project-context.mdc` for the same architecture summary as project rules.
+## Как определять время у скрэппинга
+Может появиться вопрос какое время брать у инцеденотов, которые скрэпятся по крону, кажется в общем случае лучше брать время скрэппинга, предшествующего тому, который нашел проблему). 

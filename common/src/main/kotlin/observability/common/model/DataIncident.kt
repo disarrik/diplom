@@ -6,5 +6,4 @@ data class DataIncident(
     val id: UUID,
     val data: StorageEntity,
     val incidentType: String,
-    val unixTimestamp: Long,
 )
