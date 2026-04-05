@@ -14,7 +14,7 @@ dependencies {
     implementation project(':common')
     implementation project(':state-storage')
     implementation project(':importer')
-    implementation project(':processor')
+    implementation project(':std-processor')
 }
 
 application {
