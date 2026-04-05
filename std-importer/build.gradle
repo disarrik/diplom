@@ -12,6 +12,7 @@ repositories {
 dependencies {
     testImplementation 'org.jetbrains.kotlin:kotlin-test'
     implementation(project(":common"))
+    implementation 'org.yaml:snakeyaml:2.4'
 }
 
 kotlin {

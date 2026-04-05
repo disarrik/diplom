@@ -1,0 +1,13 @@
+pollIntervalMs: 5000
+
+lineageImporters:
+  - className: observability.std.importer.lineage.TrivialLineageImporter
+
+incidentDetectors:
+  - className: observability.std.importer.detect.impls.UniqueValuesDetector
+    params:
+      connectionString: "jdbc:postgresql://localhost:5432/mydb"
+      password: "secret"
+      namespace: "default"
+      tableName: "order"
+      columnName: "id"
