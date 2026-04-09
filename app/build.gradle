@@ -22,6 +22,13 @@ application {
     mainClass = 'observability.app.MainKt'
 }
 
+tasks.named('run', JavaExec) {
+    systemProperty(
+        'observability.importer.config.path',
+        file("${projectDir}/importer-config.yaml").absolutePath,
+    )
+}
+
 kotlin {
     jvmToolchain(25)
 }

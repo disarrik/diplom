@@ -1,0 +1,24 @@
+pollIntervalMs: 5000
+
+lineageImporters:
+  - className: observability.std.importer.lineage.TrivialLineageImporter
+  # Marquez (OpenLineage backend; typical with Airflow OL). Uncomment and set baseUrl to use:
+  # - className: observability.std.importer.lineage.MarquezLineageImporter
+  #   params:
+  #     baseUrl: "http://localhost:5000"
+  #     # depth: "20"
+  #     # namespaces: "food_delivery,analytics"
+  #     # dryRunMaxDatasets: "50"
+  #     # bearerToken: ""
+  #     # username: ""
+  #     # password: ""
+  #     # apiKey: ""
+
+incidentDetectors:
+  - className: observability.std.importer.detect.impls.UniqueValuesDetector
+    params:
+      connectionString: "jdbc:postgresql://localhost:5432/mydb?user=postgres"
+      password: "secret"
+      namespace: "default"
+      tableName: "order"
+      columnName: "id"

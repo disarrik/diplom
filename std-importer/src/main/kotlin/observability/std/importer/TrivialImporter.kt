@@ -11,8 +11,12 @@ import observability.std.importer.stat.Stat
 import observability.std.importer.storage.InMemoryStatStore
 import observability.std.importer.storage.StatStore
 import org.yaml.snakeyaml.Yaml
+import java.nio.file.Files
+import java.nio.file.Paths
 
 private val PLACEHOLDER_ENTITY = TableStorageEntity(namespace = "unknown", name = "unknown")
+
+const val IMPORTER_CONFIG_PATH_PROPERTY = "observability.importer.config.path"
 
 class TrivialImporter : Importer<Unit> {
 
@@ -29,11 +33,9 @@ class TrivialImporter : Importer<Unit> {
 
     constructor() {
         val yaml = Yaml()
-        val stream = Thread.currentThread().contextClassLoader
-            .getResourceAsStream("importer-config.yaml")
-            ?: error("importer-config.yaml not found on classpath")
-
-        val config: Map<String, Any> = stream.use { yaml.load(it) }
+        val config: Map<String, Any> = openImporterConfigStream().use { stream ->
+            yaml.load(stream)
+        }
 
         pollIntervalMs = (config["pollIntervalMs"] as? Number)?.toLong() ?: 5000L
 
@@ -106,6 +108,22 @@ class TrivialImporter : Importer<Unit> {
     }
 
     companion object {
+        private fun openImporterConfigStream() =
+            System.getProperty(IMPORTER_CONFIG_PATH_PROPERTY)?.trim().orEmpty().takeIf { it.isNotEmpty() }
+                ?.let { pathProp ->
+                    val path = Paths.get(pathProp)
+                    if (!Files.isRegularFile(path)) {
+                        error(
+                            "Importer config file not found: '$pathProp' " +
+                                "(system property $IMPORTER_CONFIG_PATH_PROPERTY)",
+                        )
+                    }
+                    Files.newInputStream(path)
+                }
+                ?: error(
+                    "Set -D$IMPORTER_CONFIG_PATH_PROPERTY=/absolute/path/to/importer-config.yaml"
+                )
+
         @Suppress("UNCHECKED_CAST")
         private fun parseEntries(raw: Any?): List<Pair<String, Map<String, String>>> {
             if (raw == null) return emptyList()
