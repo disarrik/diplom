@@ -1,0 +1,143 @@
+# Run from repository root:
+#   docker compose -f examples/1/docker-compose.yaml up --build
+#
+# Postgres is published on host port 15432 (not 5432) to avoid clashing with a local Postgres.
+# Containers still use postgres:5432 on the Docker network.
+#
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: mydb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "15432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mydb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  marquez:
+    image: marquezproject/marquez:latest
+    platform: linux/amd64
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      MARQUEZ_PORT: "5000"
+      MARQUEZ_ADMIN_PORT: "5001"
+      SEARCH_ENABLED: "false"
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:5000/api/v1/namespaces >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  marquez_web:
+    image: marquezproject/marquez-web:latest
+    platform: linux/amd64
+    environment:
+      MARQUEZ_HOST: marquez
+      MARQUEZ_PORT: "5000"
+      WEB_PORT: "3000"
+      REACT_APP_ADVANCED_SEARCH: "false"
+    ports:
+      - "3000:3000"
+    depends_on:
+      marquez:
+        condition: service_healthy
+
+  airflow-init:
+    build:
+      context: ../..
+      dockerfile: examples/1/Dockerfile.airflow
+    image: observability/example1-airflow:2.10.4
+    environment: &airflow-env
+      AIRFLOW_UID: "50000"
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: Z2uDm0ZL60fXNkEXG8LW99Ki2zf8wkmIltaTz1iQPDU=
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      AIRFLOW_CONN_POSTGRES_MYDB: postgresql://postgres:secret@postgres:5432/mydb
+      AIRFLOW__OPENLINEAGE__DISABLED: "false"
+      AIRFLOW__OPENLINEAGE__NAMESPACE: example1
+      AIRFLOW__OPENLINEAGE__TRANSPORT: '{"type": "http", "url": "http://marquez:5000", "endpoint": "api/v1/lineage"}'
+    user: "50000:0"
+    entrypoint: ["/bin/bash", "-lc"]
+    command:
+      - |
+        airflow db migrate
+        airflow users create \
+          --username admin --firstname Admin --lastname User \
+          --role Admin --email admin@example.com --password admin \
+          || true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  airflow-webserver:
+    image: observability/example1-airflow:2.10.4
+    environment: *airflow-env
+    command: webserver
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - airflow_logs:/opt/airflow/logs
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      marquez:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    image: observability/example1-airflow:2.10.4
+    environment: *airflow-env
+    command: scheduler
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - airflow_logs:/opt/airflow/logs
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      marquez:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  app:
+    build:
+      context: ../..
+      dockerfile: examples/1/Dockerfile.app
+    image: observability/example1-app:local
+    environment:
+      JAVA_TOOL_OPTIONS: "-Dobservability.importer.config.path=/config/importer-config.yaml"
+    volumes:
+      - ./importer-config.yaml:/config/importer-config.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      marquez:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  airflow_logs:
