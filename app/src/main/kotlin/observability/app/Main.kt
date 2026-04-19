@@ -9,6 +9,8 @@ import observability.std.processor.StdLineageProcessor
 import observability.storage.memory.InMemoryStateService
 
 fun main(args: Array<String>) {
+    System.setProperty("observability.importer.config.path",
+        "/Users/disarra02/hse/diplom/project/examples/1/importer-config-local.yaml")
     val stateService = InMemoryStateService()
     val notifyService = LoggingNotifyService()
 

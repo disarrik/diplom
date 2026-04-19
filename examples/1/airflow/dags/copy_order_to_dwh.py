@@ -18,9 +18,9 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 from openlineage.client.event_v2 import Dataset as OlDataset
 
 _LOG = logging.getLogger(__name__)
-_PG_NAMESPACE = "postgres://postgres:5432"
-_SRC = OlDataset(namespace=_PG_NAMESPACE, name="mydb.public.order")
-_TGT = OlDataset(namespace=_PG_NAMESPACE, name="mydb.public.order_dwh")
+_PG_NAMESPACE = "postgres"
+_SRC = OlDataset(namespace=_PG_NAMESPACE, name="order")
+_TGT = OlDataset(namespace=_PG_NAMESPACE, name="order_dwh")
 
 COPY_SQL = """
 TRUNCATE order_dwh;

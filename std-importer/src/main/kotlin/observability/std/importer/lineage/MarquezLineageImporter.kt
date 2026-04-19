@@ -8,6 +8,7 @@ import observability.std.importer.lineage.marquez.LineageGraphResponse
 import observability.std.importer.lineage.marquez.NamespacesResponse
 import observability.std.importer.lineage.marquez.parseJson
 import java.util.UUID
+import java.util.logging.Logger
 
 /**
  * Imports **dataset-level** lineage from a [Marquez](https://marquezproject.ai/) OpenLineage backend.
@@ -16,7 +17,6 @@ import java.util.UUID
  * Configure in the importer YAML file (path: system property `observability.importer.config.path`) under `lineageImporters` with a `params` map:
  * - [KEY_BASE_URL] — Marquez API root (no trailing slash), e.g. `http://localhost:5000`
  * - [KEY_DEPTH] — optional lineage depth (default `20`)
- * - [KEY_NAMESPACES] — optional comma-separated namespace allowlist
  * - [KEY_DRY_RUN_MAX_DATASETS] — optional cap on lineage API calls per poll (seed datasets)
  * - [KEY_BEARER_TOKEN], [KEY_USERNAME]/[KEY_PASSWORD], [KEY_API_KEY] — optional auth
  */
@@ -24,18 +24,12 @@ class MarquezLineageImporter(
     private val params: Map<String, String>,
 ) : LineageImporter {
 
+    private val log: Logger = Logger.getLogger(MarquezLineageImporter::class.java.name)
+
     private val baseUrl: String = params[KEY_BASE_URL]?.trim()?.trimEnd('/')
         ?: error("MarquezLineageImporter: missing required param '$KEY_BASE_URL'")
 
     private val depth: Int = params[KEY_DEPTH]?.toIntOrNull() ?: 20
-
-    private val namespaceAllowlist: Set<String> =
-        params[KEY_NAMESPACES]
-            ?.split(',')
-            ?.map { it.trim() }
-            ?.filter { it.isNotEmpty() }
-            ?.toSet()
-            ?: emptySet()
 
     private val maxLineageFetches: Int? = params[KEY_DRY_RUN_MAX_DATASETS]?.toIntOrNull()
 
@@ -54,8 +48,7 @@ class MarquezLineageImporter(
             val body = http.getDatasets(ns)
             val parsed = parseJson<DatasetsResponse>(body)
             for (ds in parsed.datasets.orEmpty()) {
-                val name = ds.name
-                datasetNodeIds.add(datasetNodeId(ns, name))
+                datasetNodeIds.add(datasetNodeId(ns, ds.name))
             }
         }
 
@@ -75,18 +68,20 @@ class MarquezLineageImporter(
                 e.printStackTrace()
             }
         }
-        return byJobId.values.toList()
+
+        val result = byJobId.values.toList()
+        for (ln in result) {
+            val srcs = ln.sources.joinToString { "${it.namespace}:${it.name}" }
+            val tgts = ln.targets.joinToString { "${it.namespace}:${it.name}" }
+            log.info("imported lineage: [$srcs] -> [$tgts]")
+        }
+        return result
     }
 
     private fun resolveNamespaces(): List<String> {
         val body = http.getNamespaces()
         val parsed = parseJson<NamespacesResponse>(body)
-        val all = parsed.namespaces.orEmpty().map { it.name }
-        return if (namespaceAllowlist.isEmpty()) {
-            all
-        } else {
-            all.filter { it in namespaceAllowlist }
-        }
+        return parsed.namespaces.orEmpty().map { it.name }
     }
 
     private fun datasetNodeId(namespace: String, datasetName: String): String =
@@ -95,7 +90,6 @@ class MarquezLineageImporter(
     companion object {
         const val KEY_BASE_URL = "baseUrl"
         const val KEY_DEPTH = "depth"
-        const val KEY_NAMESPACES = "namespaces"
         const val KEY_DRY_RUN_MAX_DATASETS = "dryRunMaxDatasets"
         const val KEY_BEARER_TOKEN = "bearerToken"
         const val KEY_USERNAME = "username"

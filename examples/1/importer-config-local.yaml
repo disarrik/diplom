@@ -3,13 +3,13 @@ pollIntervalMs: 5000
 lineageImporters:
   - className: observability.std.importer.lineage.MarquezLineageImporter
     params:
-      baseUrl: "http://marquez:5000"
+      baseUrl: "http://localhost:5000"
       depth: "20"
 
 incidentDetectors:
   - className: observability.std.importer.detect.impls.UniqueValuesDetector
     params:
-      connectionString: "jdbc:postgresql://postgres:5432/mydb?user=postgres"
+      connectionString: "jdbc:postgresql://localhost:15432/mydb?user=postgres"
       password: "secret"
       namespace: "postgres"
       tableName: "order"

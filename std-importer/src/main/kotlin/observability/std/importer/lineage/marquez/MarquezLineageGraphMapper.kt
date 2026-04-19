@@ -87,7 +87,7 @@ internal object MarquezLineageGraphMapper {
 
     /**
      * Parses Marquez dataset node ids of the form `dataset:<namespace>:<name>`.
-     * If [name] contains colons, only the first segment pair is used unless we add smarter parsing.
+     * If the name contains colons, only the first segment pair is used unless we add smarter parsing.
      */
     internal fun parseDatasetNodeId(id: String): TableStorageEntity? {
         val prefix = "dataset:"
