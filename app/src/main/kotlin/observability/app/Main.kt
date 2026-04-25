@@ -12,7 +12,12 @@ fun main(args: Array<String>) {
     System.setProperty("observability.importer.config.path",
         "/Users/disarra02/hse/diplom/project/examples/1/importer-config-local.yaml")
     val stateService = InMemoryStateService()
-    val notifyService = LoggingNotifyService()
+    val adminUrl = System.getenv("OBSERVABILITY_ADMIN_URL")
+    val notifyService: NotifyService = when {
+        adminUrl.isNullOrBlank() || adminUrl.equals("none", ignoreCase = true) -> LoggingNotifyService()
+        else -> HttpNotifyService(adminUrl.trimEnd('/'))
+    }
+    println("NotifyService: ${notifyService::class.simpleName} (admin url: ${adminUrl ?: "<unset>"})")
 
     val incidentProcessor = StdIncedentProcessor(stateService, notifyService)
     val lineageProcessor = StdLineageProcessor(stateService, notifyService)
