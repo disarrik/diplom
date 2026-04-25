@@ -1,0 +1,23 @@
+# Build from repository root: docker build -f examples/1/Dockerfile.observability-admin .
+#
+# Stage 1: build the React SPA with Node, producing observability-admin/web/dist.
+FROM node:20-alpine AS web
+WORKDIR /web
+COPY observability-admin/web/ ./
+RUN npm install --no-audit --no-fund && npm run build
+
+# Stage 2: build the JVM module. We pre-bake the SPA into resources/static and
+# pass -PskipWebBuild so Gradle doesn't try to invoke npm again.
+FROM eclipse-temurin:25-jdk AS builder
+WORKDIR /workspace
+COPY . .
+COPY --from=web /web/dist /workspace/observability-admin/src/main/resources/static
+RUN ./gradlew :observability-admin:installDist -PskipWebBuild --no-daemon
+
+# Stage 3: runtime.
+FROM eclipse-temurin:25-jdk
+WORKDIR /opt/admin
+COPY --from=builder /workspace/observability-admin/build/install/observability-admin/ ./
+ENV JAVA_TOOL_OPTIONS=""
+EXPOSE 8080
+ENTRYPOINT ["/opt/admin/bin/observability-admin"]
