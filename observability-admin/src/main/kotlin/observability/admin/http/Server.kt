@@ -6,6 +6,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
+import io.ktor.server.auth.authenticate
 import io.ktor.server.http.content.singlePageApplication
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
@@ -17,11 +18,17 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
-import observability.admin.http.routes.datasourceRoutes
+import observability.admin.auth.ADMIN_AUTH
+import observability.admin.auth.installAuth
+import observability.admin.http.routes.authRoutes
+import observability.admin.http.routes.datasourceReadRoutes
+import observability.admin.http.routes.datasourceWriteRoutes
 import observability.admin.http.routes.incidentRoutes
 import observability.admin.http.routes.integrationRoutes
-import observability.admin.http.routes.memberRoutes
-import observability.admin.http.routes.teamRoutes
+import observability.admin.http.routes.memberReadRoutes
+import observability.admin.http.routes.memberWriteRoutes
+import observability.admin.http.routes.teamReadRoutes
+import observability.admin.http.routes.teamWriteRoutes
 import observability.admin.ingest.IncidentAggregator
 import observability.admin.integrations.IntegrationRegistry
 import observability.admin.store.AdminStore
@@ -40,6 +47,7 @@ fun Application.appModule(
     install(CORS) {
         anyHost()
         allowHeader(HttpHeaders.ContentType)
+        allowHeader(HttpHeaders.Authorization)
         allowMethod(HttpMethod.Put)
         allowMethod(HttpMethod.Delete)
         allowMethod(HttpMethod.Options)
@@ -50,6 +58,7 @@ fun Application.appModule(
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to (cause.message ?: "internal error")))
         }
     }
+    installAuth()
 
     routing {
         get("/healthz") { call.respondText("ok") }
@@ -69,9 +78,16 @@ private fun Route.apiRoutes(
     aggregator: IncidentAggregator,
     integrations: IntegrationRegistry,
 ) {
-    memberRoutes(store)
-    teamRoutes(store)
-    datasourceRoutes(store)
+    memberReadRoutes(store)
+    teamReadRoutes(store)
+    datasourceReadRoutes(store)
     incidentRoutes(store, aggregator, integrations)
     integrationRoutes(integrations)
+
+    authenticate(ADMIN_AUTH) {
+        authRoutes()
+        memberWriteRoutes(store)
+        teamWriteRoutes(store)
+        datasourceWriteRoutes(store)
+    }
 }

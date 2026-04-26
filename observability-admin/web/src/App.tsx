@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Avatar } from './components/Avatar';
 import { Icon } from './components/Icon';
+import { LoginModal } from './components/LoginModal';
 import { Toast } from './components/Toast';
 import { AdminPanel, type AdminTab } from './pages/AdminPanel';
 import { IncidentDetail } from './pages/IncidentDetail';
 import { IncidentsList } from './pages/IncidentsList';
 import type { Datasource, Incident, Member, Team } from './types';
 import { api } from './api';
+import { clearCreds, getCreds, UnauthorizedError } from './auth';
 
 type Route =
   | { page: 'incidents' }
@@ -17,6 +19,8 @@ type Route =
 
 const POLL_MS = 5000;
 
+const isAdminRoute = (r: Route) => r.page.startsWith('admin');
+
 export function App() {
   const [route, setRoute] = useState<Route>({ page: 'incidents' });
   const [members, setMembers] = useState<Member[]>([]);
@@ -25,8 +29,40 @@ export function App() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [currentIncident, setCurrentIncident] = useState<Incident | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [authed, setAuthed] = useState<boolean>(!!getCreds());
+  const [pendingRoute, setPendingRoute] = useState<Route | null>(null);
 
   const showToast = (msg: string) => setToast(msg);
+
+  const requireAuth = (target: Route) => {
+    if (authed) {
+      setRoute(target);
+    } else {
+      setPendingRoute(target);
+    }
+  };
+
+  const onUnauthorized = () => {
+    clearCreds();
+    setAuthed(false);
+    const target: Route = isAdminRoute(route) ? route : { page: 'admin-members' };
+    setRoute({ page: 'incidents' });
+    setPendingRoute(target);
+    showToast('Session expired, please sign in');
+  };
+
+  const guarded = <A extends unknown[], R>(fn: (...args: A) => Promise<R>) =>
+    async (...args: A): Promise<R | void> => {
+      try {
+        return await fn(...args);
+      } catch (e) {
+        if (e instanceof UnauthorizedError) {
+          onUnauthorized();
+          return;
+        }
+        throw e;
+      }
+    };
 
   const refreshAll = useCallback(async () => {
     const [m, t, d, i] = await Promise.all([
@@ -64,47 +100,47 @@ export function App() {
   const openIncidents = incidents.filter((i) => i.status === 'open');
 
   // Member CRUD
-  const addMember = async (m: Omit<Member, 'id'>) => {
+  const addMember = guarded(async (m: Omit<Member, 'id'>) => {
     const created = await api.members.create(m);
     setMembers((prev) => [created, ...prev]);
     showToast(`Added ${created.name}`);
-  };
-  const updateMember = async (m: Member) => {
+  });
+  const updateMember = guarded(async (m: Member) => {
     const updated = await api.members.update(m);
     setMembers((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-  };
-  const deleteMember = async (id: string) => {
+  });
+  const deleteMember = guarded(async (id: string) => {
     const m = members.find((x) => x.id === id);
     await api.members.remove(id);
     setMembers((prev) => prev.filter((x) => x.id !== id));
     showToast(`Removed ${m?.name ?? id}`);
-  };
+  });
 
   // Team CRUD
-  const addTeam = async (t: Omit<Team, 'id'>) => {
+  const addTeam = guarded(async (t: Omit<Team, 'id'>) => {
     const created = await api.teams.create(t);
     setTeams((prev) => [created, ...prev]);
     showToast(`Created team ${created.name}`);
-  };
-  const deleteTeam = async (id: string) => {
+  });
+  const deleteTeam = guarded(async (id: string) => {
     await api.teams.remove(id);
     setTeams((prev) => prev.filter((x) => x.id !== id));
-  };
+  });
 
   // Datasource CRUD
-  const addDatasource = async (d: Omit<Datasource, 'id'>) => {
+  const addDatasource = guarded(async (d: Omit<Datasource, 'id'>) => {
     const created = await api.datasources.create(d);
     setDatasources((prev) => [created, ...prev]);
     showToast(`Added datasource ${created.namespace}.${created.name}`);
-  };
-  const updateDatasource = async (d: Datasource) => {
+  });
+  const updateDatasource = guarded(async (d: Datasource) => {
     const updated = await api.datasources.update(d);
     setDatasources((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-  };
-  const deleteDatasource = async (id: string) => {
+  });
+  const deleteDatasource = guarded(async (id: string) => {
     await api.datasources.remove(id);
     setDatasources((prev) => prev.filter((x) => x.id !== id));
-  };
+  });
 
   // Incident actions
   const resolveCurrent = async () => {
@@ -120,6 +156,13 @@ export function App() {
     setCurrentIncident(fresh);
     setIncidents((prev) => prev.map((i) => (i.id === fresh.id ? fresh : i)));
     showToast('Integration attached');
+  };
+
+  const signOut = () => {
+    clearCreds();
+    setAuthed(false);
+    if (isAdminRoute(route)) setRoute({ page: 'incidents' });
+    showToast('Signed out');
   };
 
   return (
@@ -147,7 +190,7 @@ export function App() {
         <div className="sidebar__group-label">Admin</div>
         <button
           className={`nav-item ${route.page === 'admin-members' ? 'nav-item--active' : ''}`}
-          onClick={() => setRoute({ page: 'admin-members' })}
+          onClick={() => requireAuth({ page: 'admin-members' })}
         >
           <span className="nav-item__icon">
             <Icon name="users" size={13} />
@@ -157,7 +200,7 @@ export function App() {
         </button>
         <button
           className={`nav-item ${route.page === 'admin-teams' ? 'nav-item--active' : ''}`}
-          onClick={() => setRoute({ page: 'admin-teams' })}
+          onClick={() => requireAuth({ page: 'admin-teams' })}
         >
           <span className="nav-item__icon">
             <Icon name="team" size={13} />
@@ -167,7 +210,7 @@ export function App() {
         </button>
         <button
           className={`nav-item ${route.page === 'admin-datasources' ? 'nav-item--active' : ''}`}
-          onClick={() => setRoute({ page: 'admin-datasources' })}
+          onClick={() => requireAuth({ page: 'admin-datasources' })}
         >
           <span className="nav-item__icon">
             <Icon name="db" size={13} />
@@ -177,11 +220,35 @@ export function App() {
         </button>
 
         <div className="sidebar__user">
-          <Avatar name="Maya Chen" id="u_02" />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 500 }}>Maya Chen</div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Admin · Acme</div>
-          </div>
+          {authed ? (
+            <>
+              <Avatar name="admin" id="admin" />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 500 }}>admin</div>
+                <button
+                  onClick={signOut}
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--ink-3)',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
+            </>
+          ) : (
+            <button
+              className="btn btn--sm"
+              style={{ width: '100%' }}
+              onClick={() => setPendingRoute({ page: 'admin-members' })}
+            >
+              <Icon name="users" size={12} /> Sign in
+            </button>
+          )}
         </div>
       </aside>
 
@@ -267,6 +334,17 @@ export function App() {
         </div>
       </main>
 
+      {pendingRoute && (
+        <LoginModal
+          onClose={() => setPendingRoute(null)}
+          onSuccess={() => {
+            setAuthed(true);
+            setRoute(pendingRoute);
+            setPendingRoute(null);
+            showToast('Signed in');
+          }}
+        />
+      )}
       {toast && <Toast msg={toast} onDone={() => setToast(null)} />}
     </div>
   );

@@ -21,11 +21,16 @@ private data class TeamInput(
     val slack: String,
 )
 
-fun Route.teamRoutes(store: AdminStore) {
+fun Route.teamReadRoutes(store: AdminStore) {
     route("/teams") {
         get {
             call.respond(store.listTeams())
         }
+    }
+}
+
+fun Route.teamWriteRoutes(store: AdminStore) {
+    route("/teams") {
         post {
             val input = call.receive<TeamInput>()
             val team = Team(

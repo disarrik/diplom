@@ -22,11 +22,16 @@ private data class MemberInput(
     val teamIds: List<String> = emptyList(),
 )
 
-fun Route.memberRoutes(store: AdminStore) {
+fun Route.memberReadRoutes(store: AdminStore) {
     route("/members") {
         get {
             call.respond(store.listMembers())
         }
+    }
+}
+
+fun Route.memberWriteRoutes(store: AdminStore) {
+    route("/members") {
         post {
             val input = call.receive<MemberInput>()
             val member = Member(

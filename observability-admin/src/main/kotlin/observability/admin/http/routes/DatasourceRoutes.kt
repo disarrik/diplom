@@ -23,11 +23,16 @@ private data class DatasourceInput(
     val teamIds: List<String> = emptyList(),
 )
 
-fun Route.datasourceRoutes(store: AdminStore) {
+fun Route.datasourceReadRoutes(store: AdminStore) {
     route("/datasources") {
         get {
             call.respond(store.listDatasources())
         }
+    }
+}
+
+fun Route.datasourceWriteRoutes(store: AdminStore) {
+    route("/datasources") {
         post {
             val input = call.receive<DatasourceInput>()
             val ds = Datasource(

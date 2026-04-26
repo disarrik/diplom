@@ -1,3 +1,4 @@
+import { authHeader, UnauthorizedError } from './auth';
 import type {
   Datasource,
   Incident,
@@ -9,14 +10,29 @@ import type {
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader(),
+      ...(init?.headers || {}),
+    },
   });
+  if (res.status === 401) throw new UnauthorizedError();
   if (!res.ok) throw new Error(`${init?.method || 'GET'} ${path} → ${res.status}`);
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
 export const api = {
+  auth: {
+    me: async (username: string, password: string) => {
+      const res = await fetch('/api/auth/me', {
+        headers: { Authorization: `Basic ${btoa(`${username}:${password}`)}` },
+      });
+      if (res.status === 401) throw new UnauthorizedError();
+      if (!res.ok) throw new Error(`GET /api/auth/me → ${res.status}`);
+      return (await res.json()) as { username: string };
+    },
+  },
   members: {
     list: () => req<Member[]>('/api/members'),
     create: (m: Omit<Member, 'id'>) => req<Member>('/api/members', { method: 'POST', body: JSON.stringify(m) }),
