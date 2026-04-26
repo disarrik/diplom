@@ -1,3 +1,5 @@
+import java.io.File
+
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
@@ -43,46 +45,53 @@ val skipWebBuild = providers.gradleProperty("skipWebBuild").isPresent
 val webDir = layout.projectDirectory.dir("web")
 val staticOut = layout.projectDirectory.dir("src/main/resources/static")
 
+val webDirFile: java.io.File = webDir.asFile
+val pkgJsonFile: java.io.File = webDir.file("package.json").asFile
+val staticOutFile: java.io.File = staticOut.asFile
+
+val webEnabled = !skipWebBuild && pkgJsonFile.exists()
+
 val npmInstall by tasks.registering(Exec::class) {
     group = "web"
     description = "Install web dependencies via npm ci"
-    workingDir = webDir.asFile
+    enabled = webEnabled
+    workingDir = webDirFile
     commandLine("npm", "ci")
     inputs.file(webDir.file("package.json"))
     inputs.file(webDir.file("package-lock.json"))
     outputs.dir(webDir.dir("node_modules"))
-    onlyIf { !skipWebBuild && webDir.file("package.json").asFile.exists() }
 }
 
 val npmBuild by tasks.registering(Exec::class) {
     group = "web"
     description = "Build the SPA with Vite"
+    enabled = webEnabled
     dependsOn(npmInstall)
-    workingDir = webDir.asFile
+    workingDir = webDirFile
     commandLine("npm", "run", "build")
     inputs.dir(webDir.dir("src"))
     inputs.file(webDir.file("index.html"))
     inputs.file(webDir.file("vite.config.ts"))
     inputs.file(webDir.file("package.json"))
     outputs.dir(webDir.dir("dist"))
-    onlyIf { !skipWebBuild && webDir.file("package.json").asFile.exists() }
 }
 
 val copyWebDist by tasks.registering(Sync::class) {
     group = "web"
     description = "Copy Vite build output into static resources"
+    enabled = webEnabled
     dependsOn(npmBuild)
     from(webDir.dir("dist"))
     into(staticOut)
-    onlyIf { !skipWebBuild && webDir.dir("dist").asFile.exists() }
 }
 
 tasks.processResources {
-    if (!skipWebBuild) dependsOn(copyWebDist)
+    if (webEnabled) dependsOn(copyWebDist)
 }
 
+val staticOutPath = staticOutFile.absolutePath
 tasks.named("clean") {
     doLast {
-        staticOut.asFile.deleteRecursively()
+        File(staticOutPath).deleteRecursively()
     }
 }
