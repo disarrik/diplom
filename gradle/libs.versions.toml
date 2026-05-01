@@ -5,6 +5,7 @@ protoc = "4.29.3"
 ktor = "3.0.3"
 kotlinx-serialization = "1.7.3"
 logback = "1.5.12"
+kafka-clients = "3.8.1"
 
 [libraries]
 protobuf-kotlin = { module = "com.google.protobuf:protobuf-kotlin", version.ref = "protoc" }
@@ -24,6 +25,8 @@ ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negoti
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+
+kafka-clients = { module = "org.apache.kafka:kafka-clients", version.ref = "kafka-clients" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

@@ -1,0 +1,219 @@
+# Run from repository root:
+#   docker compose -f examples/2/docker-compose.yaml up --build
+#
+# Same stack as examples/1, but the observability `app` is split into two roles
+# (importer + processor) communicating via Kafka. The `app-importer` is
+# horizontally scalable; `app-processor` owns the in-memory state graph and
+# typically runs as a single replica.
+#
+# Host ports:
+#   15432 → postgres
+#   5000  → marquez API
+#   5001  → marquez admin
+#   3000  → marquez web
+#   8080  → airflow webserver
+#   8090  → observability admin UI/API
+#   9092  → kafka (PLAINTEXT)
+#   5005  → app-processor JVM remote debug (JDWP)
+#
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: mydb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "15432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mydb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  kafka:
+    image: apache/kafka:3.8.0
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  marquez:
+    image: marquezproject/marquez:latest
+    platform: linux/amd64
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      MARQUEZ_PORT: "5000"
+      MARQUEZ_ADMIN_PORT: "5001"
+      SEARCH_ENABLED: "false"
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:5000/api/v1/namespaces >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  marquez_web:
+    image: marquezproject/marquez-web:latest
+    platform: linux/amd64
+    environment:
+      MARQUEZ_HOST: marquez
+      MARQUEZ_PORT: "5000"
+      WEB_PORT: "3000"
+      REACT_APP_ADVANCED_SEARCH: "false"
+    ports:
+      - "3000:3000"
+    depends_on:
+      marquez:
+        condition: service_healthy
+
+  airflow-init:
+    build:
+      context: ../..
+      dockerfile: examples/1/Dockerfile.airflow
+    image: observability/example2-airflow:2.10.4
+    environment: &airflow-env
+      AIRFLOW_UID: "50000"
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: Z2uDm0ZL60fXNkEXG8LW99Ki2zf8wkmIltaTz1iQPDU=
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      AIRFLOW_CONN_POSTGRES_MYDB: postgresql://postgres:secret@postgres:5432/mydb
+      AIRFLOW__OPENLINEAGE__DISABLED: "false"
+      AIRFLOW__OPENLINEAGE__NAMESPACE: example2
+      AIRFLOW__OPENLINEAGE__TRANSPORT: '{"type": "http", "url": "http://marquez:5000", "endpoint": "api/v1/lineage"}'
+    user: "50000:0"
+    entrypoint: ["/bin/bash", "-lc"]
+    command:
+      - |
+        airflow db migrate
+        airflow users create \
+          --username admin --firstname Admin --lastname User \
+          --role Admin --email admin@example.com --password admin \
+          || true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  airflow-webserver:
+    image: observability/example2-airflow:2.10.4
+    environment: *airflow-env
+    command: webserver
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - airflow_logs:/opt/airflow/logs
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      marquez:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    image: observability/example2-airflow:2.10.4
+    environment: *airflow-env
+    command: scheduler
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - airflow_logs:/opt/airflow/logs
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      marquez:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  observability-admin:
+    build:
+      context: ../..
+      dockerfile: examples/1/Dockerfile.observability-admin
+    image: observability/example2-admin:local
+    environment:
+      PORT: "8080"
+    ports:
+      - "8090:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/healthz >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  app-processor:
+    build:
+      context: ../..
+      dockerfile: examples/1/Dockerfile.app
+    image: observability/example2-app:local
+    environment:
+      OBSERVABILITY_MODE: "processor"
+      OBSERVABILITY_ADMIN_URL: "http://observability-admin:8080"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_CONSUMER_GROUP: "observability-processor"
+      JAVA_TOOL_OPTIONS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+    ports:
+      - "5005:5005"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      observability-admin:
+        condition: service_started
+
+  app-importer:
+    build:
+      context: ../..
+      dockerfile: examples/1/Dockerfile.app
+    image: observability/example2-app:local
+    environment:
+      OBSERVABILITY_MODE: "importer"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      JAVA_TOOL_OPTIONS: "-Dobservability.importer.config.path=/config/importer-config.yaml"
+    volumes:
+      - ./importer-config.yaml:/config/importer-config.yaml:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+      marquez:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  airflow_logs:
