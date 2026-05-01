@@ -2,8 +2,8 @@ import { authHeader, UnauthorizedError } from './auth';
 import type {
   Datasource,
   Incident,
-  IntegrationProviderInfo,
   Member,
+  PluginDescriptor,
   Team,
 } from './types';
 
@@ -57,13 +57,8 @@ export const api = {
     list: () => req<Incident[]>('/api/incidents'),
     get: (id: string) => req<Incident>(`/api/incidents/${id}`),
     resolve: (id: string) => req<Incident>(`/api/incidents/${id}/resolve`, { method: 'POST' }),
-    attachIntegration: (id: string, providerId: string, params: Record<string, string>) =>
-      req<Incident>(`/api/incidents/${id}/integrations`, {
-        method: 'POST',
-        body: JSON.stringify({ providerId, params }),
-      }),
   },
-  integrations: {
-    providers: () => req<IntegrationProviderInfo[]>('/api/integrations/providers'),
+  plugins: {
+    list: () => req<PluginDescriptor[]>('/api/plugins'),
   },
 };

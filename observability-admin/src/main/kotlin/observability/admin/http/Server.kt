@@ -24,19 +24,21 @@ import observability.admin.http.routes.authRoutes
 import observability.admin.http.routes.datasourceReadRoutes
 import observability.admin.http.routes.datasourceWriteRoutes
 import observability.admin.http.routes.incidentRoutes
-import observability.admin.http.routes.integrationRoutes
 import observability.admin.http.routes.memberReadRoutes
 import observability.admin.http.routes.memberWriteRoutes
+import observability.admin.http.routes.pluginRoutes
 import observability.admin.http.routes.teamReadRoutes
 import observability.admin.http.routes.teamWriteRoutes
 import observability.admin.ingest.IncidentAggregator
-import observability.admin.integrations.IntegrationRegistry
+import observability.admin.plugins.PluginRegistry
+import observability.admin.plugins.PluginRuntime
 import observability.admin.store.AdminStore
 
 fun Application.appModule(
     store: AdminStore,
     aggregator: IncidentAggregator,
-    integrations: IntegrationRegistry,
+    plugins: PluginRegistry,
+    runtime: PluginRuntime,
 ) {
     install(ContentNegotiation) {
         json(Json {
@@ -63,7 +65,7 @@ fun Application.appModule(
     routing {
         get("/healthz") { call.respondText("ok") }
         route("/api") {
-            apiRoutes(store, aggregator, integrations)
+            apiRoutes(store, aggregator, plugins, runtime)
         }
         singlePageApplication {
             useResources = true
@@ -76,13 +78,14 @@ fun Application.appModule(
 private fun Route.apiRoutes(
     store: AdminStore,
     aggregator: IncidentAggregator,
-    integrations: IntegrationRegistry,
+    plugins: PluginRegistry,
+    runtime: PluginRuntime,
 ) {
     memberReadRoutes(store)
     teamReadRoutes(store)
     datasourceReadRoutes(store)
-    incidentRoutes(store, aggregator, integrations)
-    integrationRoutes(integrations)
+    incidentRoutes(store, aggregator, runtime)
+    pluginRoutes(plugins)
 
     authenticate(ADMIN_AUTH) {
         authRoutes()

@@ -18,7 +18,7 @@ import java.util.UUID
 private data class TeamInput(
     val name: String,
     val handle: String,
-    val slack: String,
+    val extensions: Map<String, Map<String, String>> = emptyMap(),
 )
 
 fun Route.teamReadRoutes(store: AdminStore) {
@@ -37,7 +37,7 @@ fun Route.teamWriteRoutes(store: AdminStore) {
                 id = "t_" + UUID.randomUUID().toString().take(6),
                 name = input.name,
                 handle = input.handle,
-                slack = input.slack,
+                extensions = input.extensions,
             )
             call.respond(HttpStatusCode.Created, store.upsertTeam(team))
         }

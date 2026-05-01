@@ -4,13 +4,14 @@ export interface Member {
   email: string;
   role: string;
   teamIds: string[];
+  extensions?: Record<string, Record<string, string>>;
 }
 
 export interface Team {
   id: string;
   name: string;
   handle: string;
-  slack: string;
+  extensions?: Record<string, Record<string, string>>;
 }
 
 export interface Datasource {
@@ -26,6 +27,8 @@ export interface Integration {
   type: string;
   label: string;
   url: string;
+  pluginId?: string | null;
+  extra?: Record<string, string>;
 }
 
 export interface IncidentEvent {
@@ -53,7 +56,29 @@ export interface Incident {
   events: IncidentEvent[];
 }
 
-export interface IntegrationProviderInfo {
+export type PluginFieldType = 'text' | 'url' | 'channel' | 'email' | 'number';
+
+export interface PluginFieldSpec {
+  key: string;
+  label: string;
+  type: PluginFieldType;
+  placeholder?: string | null;
+  required?: boolean;
+}
+
+export interface PluginDisplayMeta {
+  color: string;
+  iconText: string;
+  cardTitle: string;
+}
+
+export type PluginCardKind = 'link' | 'info';
+
+export interface PluginDescriptor {
   id: string;
   label: string;
+  displayMeta: PluginDisplayMeta;
+  teamFields: PluginFieldSpec[];
+  memberFields: PluginFieldSpec[];
+  cardKind: PluginCardKind;
 }

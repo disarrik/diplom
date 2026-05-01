@@ -25,5 +25,11 @@ interface AdminStore {
     suspend fun listIncidents(): List<Incident>
     suspend fun getIncident(id: String): Incident?
     suspend fun saveIncident(incident: Incident): Incident
+    suspend fun mutateIncident(id: String, fn: (Incident) -> Incident): Incident?
     suspend fun deleteIncident(id: String): Boolean
+
+    suspend fun pluginKvGet(pluginId: String, key: String): String?
+    suspend fun pluginKvPut(pluginId: String, key: String, value: String)
+    suspend fun pluginKvDelete(pluginId: String, key: String): Boolean
+    suspend fun pluginKvList(pluginId: String, prefix: String = ""): Map<String, String>
 }

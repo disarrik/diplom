@@ -14,6 +14,7 @@ class InMemoryAdminStore : AdminStore {
     private val teams = linkedMapOf<String, Team>()
     private val datasources = linkedMapOf<String, Datasource>()
     private val incidents = linkedMapOf<String, Incident>()
+    private val kv = linkedMapOf<String, MutableMap<String, String>>()
 
     fun seed(
         seedMembers: List<Member> = emptyList(),
@@ -66,7 +67,27 @@ class InMemoryAdminStore : AdminStore {
         incidents[incident.id] = incident
         incident
     }
+    override suspend fun mutateIncident(id: String, fn: (Incident) -> Incident): Incident? = mutex.withLock {
+        val cur = incidents[id] ?: return@withLock null
+        val updated = fn(cur)
+        incidents[id] = updated
+        updated
+    }
     override suspend fun deleteIncident(id: String): Boolean = mutex.withLock {
         incidents.remove(id) != null
+    }
+
+    override suspend fun pluginKvGet(pluginId: String, key: String): String? = mutex.withLock {
+        kv[pluginId]?.get(key)
+    }
+    override suspend fun pluginKvPut(pluginId: String, key: String, value: String): Unit = mutex.withLock {
+        kv.getOrPut(pluginId) { linkedMapOf() }[key] = value
+    }
+    override suspend fun pluginKvDelete(pluginId: String, key: String): Boolean = mutex.withLock {
+        kv[pluginId]?.remove(key) != null
+    }
+    override suspend fun pluginKvList(pluginId: String, prefix: String): Map<String, String> = mutex.withLock {
+        val ns = kv[pluginId] ?: return@withLock emptyMap()
+        if (prefix.isEmpty()) ns.toMap() else ns.filterKeys { it.startsWith(prefix) }
     }
 }

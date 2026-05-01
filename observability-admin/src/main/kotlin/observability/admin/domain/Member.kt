@@ -9,4 +9,5 @@ data class Member(
     val email: String,
     val role: String,
     val teamIds: List<String>,
+    val extensions: Map<String, Map<String, String>> = emptyMap(),
 )

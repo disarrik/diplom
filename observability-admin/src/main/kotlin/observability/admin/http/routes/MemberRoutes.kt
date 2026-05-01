@@ -20,6 +20,7 @@ private data class MemberInput(
     val email: String,
     val role: String,
     val teamIds: List<String> = emptyList(),
+    val extensions: Map<String, Map<String, String>> = emptyMap(),
 )
 
 fun Route.memberReadRoutes(store: AdminStore) {
@@ -40,6 +41,7 @@ fun Route.memberWriteRoutes(store: AdminStore) {
                 email = input.email,
                 role = input.role,
                 teamIds = input.teamIds,
+                extensions = input.extensions,
             )
             call.respond(HttpStatusCode.Created, store.upsertMember(member))
         }

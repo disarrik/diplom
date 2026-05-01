@@ -6,7 +6,7 @@ import { Toast } from './components/Toast';
 import { AdminPanel, type AdminTab } from './pages/AdminPanel';
 import { IncidentDetail } from './pages/IncidentDetail';
 import { IncidentsList } from './pages/IncidentsList';
-import type { Datasource, Incident, Member, Team } from './types';
+import type { Datasource, Incident, Member, PluginDescriptor, Team } from './types';
 import { api } from './api';
 import { clearCreds, getCreds, UnauthorizedError } from './auth';
 
@@ -27,6 +27,7 @@ export function App() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [datasources, setDatasources] = useState<Datasource[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [plugins, setPlugins] = useState<PluginDescriptor[]>([]);
   const [currentIncident, setCurrentIncident] = useState<Incident | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [authed, setAuthed] = useState<boolean>(!!getCreds());
@@ -65,16 +66,18 @@ export function App() {
     };
 
   const refreshAll = useCallback(async () => {
-    const [m, t, d, i] = await Promise.all([
+    const [m, t, d, i, p] = await Promise.all([
       api.members.list(),
       api.teams.list(),
       api.datasources.list(),
       api.incidents.list(),
+      api.plugins.list(),
     ]);
     setMembers(m);
     setTeams(t);
     setDatasources(d);
     setIncidents(i);
+    setPlugins(p);
   }, []);
 
   useEffect(() => {
@@ -149,13 +152,6 @@ export function App() {
     setCurrentIncident(updated);
     setIncidents((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
     showToast('Incident resolved');
-  };
-  const reloadCurrent = async () => {
-    if (!currentIncident) return;
-    const fresh = await api.incidents.get(currentIncident.id);
-    setCurrentIncident(fresh);
-    setIncidents((prev) => prev.map((i) => (i.id === fresh.id ? fresh : i)));
-    showToast('Integration attached');
   };
 
   const signOut = () => {
@@ -302,9 +298,9 @@ export function App() {
               datasources={datasources}
               teams={teams}
               members={members}
+              plugins={plugins}
               onBack={() => setRoute({ page: 'incidents' })}
               onResolve={resolveCurrent}
-              onAttached={reloadCurrent}
             />
           )}
           {route.page === 'incident' && !currentIncident && <div className="empty">Loading incident…</div>}
@@ -314,6 +310,7 @@ export function App() {
               members={members}
               teams={teams}
               datasources={datasources}
+              plugins={plugins}
               initialTab={
                 route.page === 'admin-teams'
                   ? 'teams'

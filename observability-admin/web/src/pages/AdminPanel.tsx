@@ -4,7 +4,8 @@ import { DSBadge } from '../components/StatusPill';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import { MultiSelect } from '../components/MultiSelect';
-import type { Datasource, Member, Team } from '../types';
+import { PluginFields } from '../components/PluginFields';
+import type { Datasource, Member, PluginDescriptor, Team } from '../types';
 
 export type AdminTab = 'members' | 'teams' | 'datasources';
 
@@ -12,6 +13,7 @@ export function AdminPanel({
   members,
   teams,
   datasources,
+  plugins,
   initialTab,
   onAddMember,
   onUpdateMember,
@@ -25,6 +27,7 @@ export function AdminPanel({
   members: Member[];
   teams: Team[];
   datasources: Datasource[];
+  plugins: PluginDescriptor[];
   initialTab: AdminTab;
   onAddMember: (m: Omit<Member, 'id'>) => void;
   onUpdateMember: (m: Member) => void;
@@ -64,6 +67,7 @@ export function AdminPanel({
         <MembersTab
           members={members}
           teams={teams}
+          plugins={plugins}
           onAdd={onAddMember}
           onUpdate={onUpdateMember}
           onDelete={onDeleteMember}
@@ -74,6 +78,7 @@ export function AdminPanel({
           teams={teams}
           members={members}
           datasources={datasources}
+          plugins={plugins}
           onAdd={onAddTeam}
           onDelete={onDeleteTeam}
         />
@@ -94,17 +99,20 @@ export function AdminPanel({
 function MembersTab({
   members,
   teams,
+  plugins,
   onAdd,
   onUpdate,
   onDelete,
 }: {
   members: Member[];
   teams: Team[];
+  plugins: PluginDescriptor[];
   onAdd: (m: Omit<Member, 'id'>) => void;
   onUpdate: (m: Member) => void;
   onDelete: (id: string) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  const memberPlugins = plugins.filter((p) => p.memberFields.length > 0);
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -125,6 +133,7 @@ function MembersTab({
               <th style={{ width: 220 }}>Email</th>
               <th style={{ width: 160 }}>Role</th>
               <th>Teams</th>
+              {memberPlugins.length > 0 && <th style={{ width: 180 }}>Plugin fields</th>}
               <th style={{ width: 50 }}></th>
             </tr>
           </thead>
@@ -148,6 +157,11 @@ function MembersTab({
                     getLabel={(t) => t.name}
                   />
                 </td>
+                {memberPlugins.length > 0 && (
+                  <td>
+                    <PluginExtensionChips entity={m} plugins={memberPlugins} kind="member" />
+                  </td>
+                )}
                 <td>
                   <button className="icon-btn" onClick={() => onDelete(m.id)}>
                     <Icon name="trash" size={13} />
@@ -162,6 +176,7 @@ function MembersTab({
       {adding && (
         <NewMemberModal
           teams={teams}
+          plugins={memberPlugins}
           onClose={() => setAdding(false)}
           onSubmit={(m) => {
             onAdd(m);
@@ -175,10 +190,12 @@ function MembersTab({
 
 function NewMemberModal({
   teams,
+  plugins,
   onClose,
   onSubmit,
 }: {
   teams: Team[];
+  plugins: PluginDescriptor[];
   onClose: () => void;
   onSubmit: (m: Omit<Member, 'id'>) => void;
 }) {
@@ -186,9 +203,10 @@ function NewMemberModal({
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('Data Engineer');
   const [teamIds, setTeamIds] = useState<string[]>([]);
+  const [extensions, setExtensions] = useState<Record<string, Record<string, string>>>({});
   const submit = () => {
     if (!name.trim() || !email.trim()) return;
-    onSubmit({ name, email, role, teamIds });
+    onSubmit({ name, email, role, teamIds, extensions });
   };
   return (
     <Modal
@@ -245,6 +263,16 @@ function NewMemberModal({
           getLabel={(t) => t.name}
         />
       </div>
+      {plugins.map((p) => (
+        <div key={p.id}>
+          <div className="field__label" style={{ marginTop: 8 }}>{p.label}</div>
+          <PluginFields
+            schema={p.memberFields}
+            value={extensions[p.id] ?? {}}
+            onChange={(next) => setExtensions({ ...extensions, [p.id]: next })}
+          />
+        </div>
+      ))}
     </Modal>
   );
 }
@@ -253,16 +281,19 @@ function TeamsTab({
   teams,
   members,
   datasources,
+  plugins,
   onAdd,
   onDelete,
 }: {
   teams: Team[];
   members: Member[];
   datasources: Datasource[];
+  plugins: PluginDescriptor[];
   onAdd: (t: Omit<Team, 'id'>) => void;
   onDelete: (id: string) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  const teamPlugins = plugins.filter((p) => p.teamFields.length > 0);
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -283,7 +314,7 @@ function TeamsTab({
               <th style={{ width: 180 }}>Handle</th>
               <th style={{ width: 100 }}>Members</th>
               <th style={{ width: 120 }}>Datasources</th>
-              <th>Slack default</th>
+              <th>Plugin fields</th>
               <th style={{ width: 50 }}></th>
             </tr>
           </thead>
@@ -308,7 +339,9 @@ function TeamsTab({
                     )}
                   </td>
                   <td style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--ink-2)' }}>{teamDs.length}</td>
-                  <td className="col-mono">{t.slack}</td>
+                  <td>
+                    <PluginExtensionChips entity={t} plugins={teamPlugins} kind="team" />
+                  </td>
                   <td>
                     <button className="icon-btn" onClick={() => onDelete(t.id)}>
                       <Icon name="trash" size={13} />
@@ -323,6 +356,7 @@ function TeamsTab({
 
       {adding && (
         <NewTeamModal
+          plugins={teamPlugins}
           onClose={() => setAdding(false)}
           onSubmit={(t) => {
             onAdd(t);
@@ -334,22 +368,80 @@ function TeamsTab({
   );
 }
 
+function PluginExtensionChips({
+  entity,
+  plugins,
+  kind,
+}: {
+  entity: { extensions?: Record<string, Record<string, string>> };
+  plugins: PluginDescriptor[];
+  kind: 'team' | 'member';
+}) {
+  const chips: { plugin: PluginDescriptor; value: string }[] = [];
+  for (const p of plugins) {
+    const fields = kind === 'team' ? p.teamFields : p.memberFields;
+    const ns = entity.extensions?.[p.id];
+    if (!ns) continue;
+    const first = fields[0];
+    const v = first ? ns[first.key] : undefined;
+    if (v) chips.push({ plugin: p, value: v });
+  }
+  if (chips.length === 0) return <span style={{ color: 'var(--ink-4)', fontSize: 12 }}>—</span>;
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {chips.map(({ plugin, value }) => (
+        <span
+          key={plugin.id}
+          style={{
+            fontSize: 11,
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--ink-2)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          <span
+            style={{
+              width: 14,
+              height: 14,
+              borderRadius: 3,
+              background: plugin.displayMeta.color,
+              color: 'white',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 9,
+            }}
+          >
+            {plugin.displayMeta.iconText}
+          </span>
+          {value}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function NewTeamModal({
+  plugins,
   onClose,
   onSubmit,
 }: {
+  plugins: PluginDescriptor[];
   onClose: () => void;
   onSubmit: (t: Omit<Team, 'id'>) => void;
 }) {
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
-  const [slack, setSlack] = useState('');
+  const [extensions, setExtensions] = useState<Record<string, Record<string, string>>>({});
   const submit = () => {
     if (!name.trim()) return;
     onSubmit({
       name,
       handle: handle || '@' + name.toLowerCase().replace(/\s+/g, '-'),
-      slack: slack || '#data-' + name.toLowerCase().replace(/\s+/g, '-'),
+      extensions,
     });
   };
   return (
@@ -386,15 +478,16 @@ function NewTeamModal({
           placeholder="@marketing-analytics"
         />
       </div>
-      <div className="field">
-        <div className="field__label">Default Slack channel</div>
-        <input
-          className="field__input"
-          value={slack}
-          onChange={(e) => setSlack(e.target.value)}
-          placeholder="#data-marketing"
-        />
-      </div>
+      {plugins.map((p) => (
+        <div key={p.id}>
+          <div className="field__label" style={{ marginTop: 8 }}>{p.label}</div>
+          <PluginFields
+            schema={p.teamFields}
+            value={extensions[p.id] ?? {}}
+            onChange={(next) => setExtensions({ ...extensions, [p.id]: next })}
+          />
+        </div>
+      ))}
     </Modal>
   );
 }

@@ -1,37 +1,34 @@
-import { useEffect, useState } from 'react';
 import { Avatar, AvatarStack } from '../components/Avatar';
 import { Icon } from '../components/Icon';
-import { Modal } from '../components/Modal';
 import { DSBadge, StatusPill } from '../components/StatusPill';
 import { fmtDuration, fmtTime } from '../lib/time';
 import type {
   Datasource,
   Incident,
   Integration,
-  IntegrationProviderInfo,
   Member,
+  PluginDescriptor,
   Team,
 } from '../types';
-import { api } from '../api';
 
 export function IncidentDetail({
   incident,
   datasources,
   teams,
   members,
+  plugins,
   onBack,
   onResolve,
-  onAttached,
 }: {
   incident: Incident;
   datasources: Datasource[];
   teams: Team[];
   members: Member[];
+  plugins: PluginDescriptor[];
   onBack: () => void;
   onResolve: () => void;
-  onAttached: () => void;
 }) {
-  const [adding, setAdding] = useState(false);
+  const pluginById = new Map(plugins.map((p) => [p.id, p]));
 
   const team = teams.find((t) => t.id === incident.teamId);
   const assignee = members.find((m) => m.id === incident.assigneeId);
@@ -193,53 +190,35 @@ export function IncidentDetail({
           <div className="side-section">
             <div className="side-label">Integrations</div>
             {incident.integrations.map((it, i) => (
-              <IntegrationCard key={i} integration={it} />
+              <IntegrationCard key={i} integration={it} plugin={pluginById.get(it.pluginId ?? it.type)} />
             ))}
             {incident.integrations.length === 0 && (
               <div style={{ fontSize: 12, color: 'var(--ink-4)', marginBottom: 8 }}>
-                No integrations attached.
+                No integrations attached yet.
               </div>
             )}
-            <button className="integration-add" onClick={() => setAdding(true)}>
-              <Icon name="plus" size={12} /> Attach integration
-            </button>
             <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 8, lineHeight: 1.5 }}>
               The conversation lives in your tools. We just keep the link.
             </div>
           </div>
         </aside>
       </div>
-
-      {adding && (
-        <AttachIntegrationModal
-          incidentId={incident.id}
-          onClose={() => setAdding(false)}
-          onAttached={() => {
-            setAdding(false);
-            onAttached();
-          }}
-        />
-      )}
     </>
   );
 }
 
-function IntegrationCard({ integration }: { integration: Integration }) {
-  const meta: Record<string, { bg: string; label: string; icon: string }> = {
-    slack: { bg: '#4A154B', label: 'Slack', icon: '#' },
-    jira: { bg: '#0052CC', label: 'Jira', icon: 'J' },
-  };
-  const m = meta[integration.type] ?? { bg: '#404040', label: integration.type, icon: '?' };
+function IntegrationCard({ integration, plugin }: { integration: Integration; plugin?: PluginDescriptor }) {
+  const m = plugin?.displayMeta ?? { color: '#404040', iconText: '?', cardTitle: integration.type };
   return (
     <a href={integration.url} target="_blank" rel="noreferrer" className="integration-card">
       <div
         className="integration-card__icon"
-        style={{ background: m.bg, color: 'white', fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+        style={{ background: m.color, color: 'white', fontFamily: 'var(--font-mono)', fontWeight: 700 }}
       >
-        {m.icon}
+        {m.iconText}
       </div>
       <div className="integration-card__body">
-        <div className="integration-card__title">{m.label}</div>
+        <div className="integration-card__title">{m.cardTitle}</div>
         <div className="integration-card__sub">{integration.label}</div>
       </div>
       <span className="integration-card__ext">
@@ -249,111 +228,3 @@ function IntegrationCard({ integration }: { integration: Integration }) {
   );
 }
 
-function AttachIntegrationModal({
-  incidentId,
-  onClose,
-  onAttached,
-}: {
-  incidentId: string;
-  onClose: () => void;
-  onAttached: () => void;
-}) {
-  const [providers, setProviders] = useState<IntegrationProviderInfo[] | null>(null);
-  const [providerId, setProviderId] = useState<string>('');
-  const [paramsText, setParamsText] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api.integrations
-      .providers()
-      .then((p) => {
-        setProviders(p);
-        if (p.length > 0) setProviderId(p[0].id);
-      })
-      .catch(() => setProviders([]));
-  }, []);
-
-  const submit = async () => {
-    setError(null);
-    if (!providerId) {
-      setError('Pick a provider.');
-      return;
-    }
-    let params: Record<string, string> = {};
-    if (paramsText.trim()) {
-      try {
-        params = JSON.parse(paramsText);
-      } catch {
-        setError('Params must be JSON.');
-        return;
-      }
-    }
-    try {
-      await api.incidents.attachIntegration(incidentId, providerId, params);
-      onAttached();
-    } catch (e) {
-      setError(String(e));
-    }
-  };
-
-  return (
-    <Modal
-      title="Attach integration"
-      onClose={onClose}
-      footer={
-        <>
-          <button className="btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="btn btn--primary"
-            onClick={submit}
-            disabled={!providers || providers.length === 0}
-          >
-            Create &amp; attach
-          </button>
-        </>
-      }
-    >
-      {providers === null && <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Loading providers…</div>}
-      {providers && providers.length === 0 && (
-        <div style={{ fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.5 }}>
-          No integration providers configured. Implementations of <code>IntegrationProvider</code> registered
-          on the server appear here.
-        </div>
-      )}
-      {providers && providers.length > 0 && (
-        <>
-          <div className="field">
-            <div className="field__label">Provider</div>
-            <select
-              className="field__select"
-              value={providerId}
-              onChange={(e) => setProviderId(e.target.value)}
-            >
-              {providers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <div className="field__label">Params (JSON)</div>
-            <input
-              className="field__input"
-              placeholder='{"project":"DATA"}'
-              value={paramsText}
-              onChange={(e) => setParamsText(e.target.value)}
-            />
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>
-            The provider creates the resource via its API and returns a reference URL — the conversation is
-            not stored here.
-          </div>
-        </>
-      )}
-      {error && <div style={{ fontSize: 12, color: 'var(--danger)' }}>{error}</div>}
-    </Modal>
-  );
-}

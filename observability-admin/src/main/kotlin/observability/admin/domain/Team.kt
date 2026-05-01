@@ -7,5 +7,5 @@ data class Team(
     val id: String,
     val name: String,
     val handle: String,
-    val slack: String,
+    val extensions: Map<String, Map<String, String>> = emptyMap(),
 )

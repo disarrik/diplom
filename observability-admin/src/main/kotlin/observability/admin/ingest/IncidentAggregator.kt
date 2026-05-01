@@ -6,11 +6,13 @@ import observability.admin.domain.Datasource
 import observability.admin.domain.Incident
 import observability.admin.domain.IncidentEvent
 import observability.admin.domain.IncidentStatus
+import observability.admin.plugins.PluginRuntime
 import observability.admin.store.AdminStore
 
 class IncidentAggregator(
     private val store: AdminStore,
     private val router: IncidentRouter,
+    private val plugins: PluginRuntime,
 ) {
     private val mutex = Mutex()
     private val stillAffected = mutableMapOf<String, MutableSet<String>>()
@@ -19,6 +21,9 @@ class IncidentAggregator(
     suspend fun ingest(event: IncidentEventDto) {
         val affectedDs = resolveDatasource(event.affectedEntity)
         val isRoot = event.affectedEntity == event.rootEntity
+
+        var openedJustNow: Incident? = null
+        var resolvedJustNow: Incident? = null
 
         mutex.withLock {
             val existing = store.getIncident(event.incidentId)
@@ -57,6 +62,7 @@ class IncidentAggregator(
                 store.saveIncident(incident)
                 stillAffected[event.incidentId] = mutableSetOf(affectedDs.id)
                 rootFinished[event.incidentId] = false
+                openedJustNow = incident
                 return@withLock
             }
 
@@ -108,7 +114,11 @@ class IncidentAggregator(
                 events = newEvents,
             )
             store.saveIncident(updated)
+            if (shouldResolve) resolvedJustNow = updated
         }
+
+        openedJustNow?.let { plugins.fireOpened(it) }
+        resolvedJustNow?.let { plugins.fireResolved(it) }
     }
 
     private suspend fun resolveDatasource(entity: StorageEntityDto): Datasource {

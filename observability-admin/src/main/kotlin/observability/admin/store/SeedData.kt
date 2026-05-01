@@ -6,10 +6,14 @@ import observability.admin.domain.Team
 
 object SeedData {
     val teams = listOf(
-        Team("t_payments", "Payments", "@payments", "#data-payments"),
-        Team("t_growth", "Growth Analytics", "@growth-analytics", "#data-growth"),
-        Team("t_platform", "Data Platform", "@data-platform", "#data-platform"),
-        Team("t_warehouse", "Warehouse", "@warehouse", "#data-warehouse"),
+        Team("t_payments", "Payments", "@payments",
+            extensions = mapOf("slack" to mapOf("channel" to "#data-payments"))),
+        Team("t_growth", "Growth Analytics", "@growth-analytics",
+            extensions = mapOf("slack" to mapOf("channel" to "#data-growth"))),
+        Team("t_platform", "Data Platform", "@data-platform",
+            extensions = mapOf("slack" to mapOf("channel" to "#data-platform"))),
+        Team("t_warehouse", "Warehouse", "@warehouse",
+            extensions = mapOf("slack" to mapOf("channel" to "#data-warehouse"))),
     )
 
     val members = listOf(
