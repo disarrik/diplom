@@ -13,4 +13,4 @@ incidentDetectors:
       password: "secret"
       namespace: "postgres"
       tableName: "order"
-      columnName: "id"
+      columnName: "status"
