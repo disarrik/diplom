@@ -6,7 +6,7 @@
 ## Архитектура
 
 ```
-Postgres (mydb)  ──▶  Airflow DAG  ──▶  order_dwh
+Postgres (postgres-demo)  ──▶  Airflow DAG  ──▶  order_dwh
       │                    │
       │              OpenLineage / Marquez
       │
@@ -66,7 +66,7 @@ SELECT COUNT(DISTINCT "status") FROM "order";
 Подключитесь к базе данных:
 
 ```bash
-psql -h localhost -p 15432 -U postgres -d mydb
+psql -h localhost -p 15432 -U postgres -d postgres-demo
 # пароль: secret
 ```
 

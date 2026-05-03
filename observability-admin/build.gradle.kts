@@ -25,6 +25,8 @@ dependencies {
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.logback.classic)
+    implementation(libs.hikari)
+    implementation(libs.postgres.jdbc)
 
     testImplementation(kotlin("test"))
 }

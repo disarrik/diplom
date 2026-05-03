@@ -30,7 +30,7 @@ SELECT id, customer_name, amount FROM "order";
 
 
 class CopyOrderToDwhOperator(BaseOperator):
-    def __init__(self, *, conn_id: str = "postgres_mydb", **kwargs) -> None:
+    def __init__(self, *, conn_id: str = "postgres_demo", **kwargs) -> None:
         super().__init__(**kwargs)
         self.conn_id = conn_id
 

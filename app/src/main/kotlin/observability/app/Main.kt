@@ -11,7 +11,7 @@ import observability.common.notify.NotifyService
 import observability.std.importer.TrivialImporter
 import observability.std.processor.StdIncedentProcessor
 import observability.std.processor.StdLineageProcessor
-import observability.storage.memory.InMemoryStateService
+import observability.storage.postgres.PostgresStateServiceFactory
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.KafkaProducer
 
@@ -27,7 +27,7 @@ fun main(args: Array<String>) {
 }
 
 private fun runMonolith() {
-    val stateService = InMemoryStateService()
+    val stateService = PostgresStateServiceFactory.fromEnv()
     val notifyService = buildNotifyService()
     val incidentProcessor = StdIncedentProcessor(stateService, notifyService)
     val lineageProcessor = StdLineageProcessor(stateService, notifyService)
@@ -62,7 +62,7 @@ private fun runImporter() {
 }
 
 private fun runProcessor() {
-    val stateService = InMemoryStateService()
+    val stateService = PostgresStateServiceFactory.fromEnv()
     val notifyService = buildNotifyService()
     val lineageProcessor = StdLineageProcessor(stateService, notifyService)
     val incidentProcessor = StdIncedentProcessor(stateService, notifyService)

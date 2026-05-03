@@ -1,4 +1,4 @@
-\c mydb
+\c "postgres-demo"
 
 CREATE TABLE IF NOT EXISTS "order" (
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,

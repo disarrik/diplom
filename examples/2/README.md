@@ -6,7 +6,7 @@
 - **app-importer** — крутит `TrivialImporter`: опрашивает Marquez и Postgres,
   публикует события в Kafka. Масштабируется горизонтально по числу источников.
 - **app-processor** — обрабатывает события из Kafka, владеет графом lineage
-  (`InMemoryStateService`), вызывает `observability-admin` через HTTP.
+  (`PostgresStateService`, БД `state_storage`), вызывает `observability-admin` через HTTP.
   Обычно достаточно одной реплики.
 
 Профиль выбирается переменной окружения `OBSERVABILITY_MODE`
@@ -26,7 +26,7 @@ TrivialImporter         ──►  observability.incidents (key=incident.id)
                                  ▼
 [ app-processor (1x) ]
 LineageConsumerLoop  → StdLineageProcessor   ─┐
-IncidentConsumerLoop → StdIncedentProcessor ─┤  state: InMemoryStateService
+IncidentConsumerLoop → StdIncedentProcessor ─┤  state: PostgresStateService (state_storage DB)
                                               ▼
                                       HttpNotifyService → observability-admin
 ```
@@ -60,7 +60,7 @@ app-processor   | processor: started; consuming from kafka:9092 ...
 admin-панели на http://localhost:8090.
 
 ```sql
--- psql -h localhost -p 15432 -U postgres -d mydb  (пароль: secret)
+-- psql -h localhost -p 15432 -U postgres -d postgres-demo  (пароль: secret)
 INSERT INTO "order" (customer_name, amount, status)
 VALUES ('Evil Corp', 9999.99, 'unknown');
 ```

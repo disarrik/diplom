@@ -6,7 +6,6 @@ import io.mockk.verify
 import observability.common.notify.NotifyService
 import observability.common.processor.LineageProcessor
 import observability.common.model.*
-import observability.storage.memory.InMemoryStateService
 import java.util.UUID
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -14,13 +13,13 @@ import kotlin.test.assertEquals
 
 class LineageProcessorTest {
 
-    private lateinit var stateService: InMemoryStateService
+    private lateinit var stateService: FakeStateService
     private lateinit var notifyService: NotifyService
     private lateinit var processor: LineageProcessor
 
     @BeforeTest
     fun setUp() {
-        stateService = InMemoryStateService()
+        stateService = FakeStateService()
         notifyService = mockk(relaxed = true)
         processor = StdLineageProcessor(stateService, notifyService)
     }

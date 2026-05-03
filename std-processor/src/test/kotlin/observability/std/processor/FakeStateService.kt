@@ -1,11 +1,11 @@
-package observability.storage.memory
+package observability.std.processor
 
 import observability.common.StateService
 import observability.common.model.DataIncident
 import observability.common.model.StorageEntity
 import java.util.UUID
 
-class InMemoryStateService : StateService {
+class FakeStateService : StateService {
 
     private val children = mutableMapOf<StorageEntity, MutableSet<StorageEntity>>()
     private val parents = mutableMapOf<StorageEntity, MutableSet<StorageEntity>>()

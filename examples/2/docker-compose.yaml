@@ -20,7 +20,7 @@ services:
   postgres:
     image: postgres:17
     environment:
-      POSTGRES_DB: mydb
+      POSTGRES_DB: postgres-demo
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: secret
     ports:
@@ -29,7 +29,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d mydb"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres-demo"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -107,7 +107,7 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
       AIRFLOW__CORE__FERNET_KEY: Z2uDm0ZL60fXNkEXG8LW99Ki2zf8wkmIltaTz1iQPDU=
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
-      AIRFLOW_CONN_POSTGRES_MYDB: postgresql://postgres:secret@postgres:5432/mydb
+      AIRFLOW_CONN_POSTGRES_DEMO: postgresql://postgres:secret@postgres:5432/postgres-demo
       AIRFLOW__OPENLINEAGE__DISABLED: "false"
       AIRFLOW__OPENLINEAGE__NAMESPACE: example2
       AIRFLOW__OPENLINEAGE__TRANSPORT: '{"type": "http", "url": "http://marquez:5000", "endpoint": "api/v1/lineage"}'
@@ -165,8 +165,14 @@ services:
     image: observability/example2-admin:local
     environment:
       PORT: "8080"
+      ADMIN_DB_JDBC_URL: "jdbc:postgresql://postgres:5432/observability_admin"
+      ADMIN_DB_JDBC_USER: "postgres"
+      ADMIN_DB_JDBC_PASSWORD: "secret"
     ports:
       - "8090:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/healthz >/dev/null"]
       interval: 10s
@@ -184,11 +190,16 @@ services:
       OBSERVABILITY_ADMIN_URL: "http://observability-admin:8080"
       KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
       KAFKA_CONSUMER_GROUP: "observability-processor"
+      STATE_STORAGE_JDBC_URL: "jdbc:postgresql://postgres:5432/state_storage"
+      STATE_STORAGE_JDBC_USER: "postgres"
+      STATE_STORAGE_JDBC_PASSWORD: "secret"
       JAVA_TOOL_OPTIONS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
     ports:
       - "5005:5005"
     depends_on:
       kafka:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
       observability-admin:
         condition: service_started

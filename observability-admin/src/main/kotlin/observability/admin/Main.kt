@@ -10,15 +10,12 @@ import observability.admin.plugins.PluginRuntime
 import observability.admin.plugins.jira.JiraPlugin
 import observability.admin.plugins.mockmsg.MockMessengerPlugin
 import observability.admin.plugins.slack.SlackPlugin
-import observability.admin.store.InMemoryAdminStore
-import observability.admin.store.SeedData
+import observability.admin.store.PostgresAdminStoreFactory
 
 fun main() {
     val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
 
-    val store = InMemoryAdminStore().apply {
-        seed(seedTeams = SeedData.teams, seedMembers = SeedData.members, seedDatasources = SeedData.datasources)
-    }
+    val store = PostgresAdminStoreFactory.fromEnv()
     val plugins = PluginRegistry().apply {
         register(SlackPlugin())
         register(JiraPlugin())

@@ -6,6 +6,8 @@ ktor = "3.0.3"
 kotlinx-serialization = "1.7.3"
 logback = "1.5.12"
 kafka-clients = "3.8.1"
+hikari = "6.2.1"
+postgres-jdbc = "42.7.4"
 
 [libraries]
 protobuf-kotlin = { module = "com.google.protobuf:protobuf-kotlin", version.ref = "protoc" }
@@ -27,6 +29,9 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 
 kafka-clients = { module = "org.apache.kafka:kafka-clients", version.ref = "kafka-clients" }
+
+hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
+postgres-jdbc = { module = "org.postgresql:postgresql", version.ref = "postgres-jdbc" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
