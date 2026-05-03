@@ -1,0 +1,16 @@
+pollIntervalMs: 5000
+
+lineageImporters:
+  - className: observability.std.importer.lineage.MarquezLineageImporter
+    params:
+      baseUrl: "http://marquez:5000"
+      depth: "20"
+
+incidentDetectors:
+  - className: observability.std.importer.detect.impls.UniqueValuesDetector
+    params:
+      connectionString: "jdbc:postgresql://postgres:5432/postgres-demo?user=postgres"
+      password: "secret"
+      namespace: "postgres"
+      tableName: "d1"
+      columnName: "status"

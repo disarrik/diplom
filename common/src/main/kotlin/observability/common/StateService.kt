@@ -2,6 +2,7 @@ package observability.common
 
 import observability.common.model.DataIncident
 import observability.common.model.StorageEntity
+import java.util.UUID
 
 interface StateService {
     // идет от текущей ноды рекурсивно по родитеельским, при переходе к родительской ноде запоминает ts перехода
@@ -17,7 +18,7 @@ interface StateService {
     // returns deleted affected
     fun unlink(source: StorageEntity, target: StorageEntity): List<StorageEntity>
     // returns affected
-    fun registerChange(storageEntity: StorageEntity, changeType: String): List<StorageEntity>
+    fun registerChange(incidentId: UUID, storageEntity: StorageEntity, changeType: String): List<StorageEntity>
     // returns not affected anymore
     fun unregisterChange(storageEntity: StorageEntity, changeType: String): List<StorageEntity>
 }

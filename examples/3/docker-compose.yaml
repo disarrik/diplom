@@ -1,0 +1,185 @@
+# Run from repository root:
+#   docker compose -f examples/3/docker-compose.yaml up --build
+#
+# Same monolithic stack as examples/1, but with three demo tables (d1, d2, d3)
+# and two Airflow DAGs. The second DAG (`copy_d2_to_d3`) has no schedule and
+# must be triggered manually — the scenario is "incident on d1 propagates to
+# d3 after the new lineage edge is added".
+#
+# Postgres is published on host port 15432 (not 5432) to avoid clashing with a local Postgres.
+# Containers still use postgres:5432 on the Docker network.
+#
+# Host ports:
+#   15432 → postgres
+#   5000  → marquez API
+#   5001  → marquez admin
+#   3000  → marquez web
+#   8080  → airflow webserver
+#   8090  → observability admin UI/API
+#   5005  → app JVM remote debug (JDWP)
+#
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: postgres-demo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "15432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres-demo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  marquez:
+    image: marquezproject/marquez:latest
+    platform: linux/amd64
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      MARQUEZ_PORT: "5000"
+      MARQUEZ_ADMIN_PORT: "5001"
+      SEARCH_ENABLED: "false"
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:5000/api/v1/namespaces >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  marquez_web:
+    image: marquezproject/marquez-web:latest
+    platform: linux/amd64
+    environment:
+      MARQUEZ_HOST: marquez
+      MARQUEZ_PORT: "5000"
+      WEB_PORT: "3000"
+      REACT_APP_ADVANCED_SEARCH: "false"
+    ports:
+      - "3000:3000"
+    depends_on:
+      marquez:
+        condition: service_healthy
+
+  airflow-init:
+    build:
+      context: ../..
+      dockerfile: examples/1/Dockerfile.airflow
+    image: observability/example3-airflow:2.10.4
+    environment: &airflow-env
+      AIRFLOW_UID: "50000"
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: Z2uDm0ZL60fXNkEXG8LW99Ki2zf8wkmIltaTz1iQPDU=
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      AIRFLOW_CONN_POSTGRES_DEMO: postgresql://postgres:secret@postgres:5432/postgres-demo
+      AIRFLOW__OPENLINEAGE__DISABLED: "false"
+      AIRFLOW__OPENLINEAGE__NAMESPACE: example3
+      AIRFLOW__OPENLINEAGE__TRANSPORT: '{"type": "http", "url": "http://marquez:5000", "endpoint": "api/v1/lineage"}'
+    user: "50000:0"
+    entrypoint: ["/bin/bash", "-lc"]
+    command:
+      - |
+        airflow db migrate
+        airflow users create \
+          --username admin --firstname Admin --lastname User \
+          --role Admin --email admin@example.com --password admin \
+          || true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  airflow-webserver:
+    image: observability/example3-airflow:2.10.4
+    environment: *airflow-env
+    command: webserver
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - airflow_logs:/opt/airflow/logs
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      marquez:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    image: observability/example3-airflow:2.10.4
+    environment: *airflow-env
+    command: scheduler
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - airflow_logs:/opt/airflow/logs
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      marquez:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  observability-admin:
+    build:
+      context: ../..
+      dockerfile: examples/1/Dockerfile.observability-admin
+    image: observability/example3-admin:local
+    environment:
+      PORT: "8080"
+      ADMIN_DB_JDBC_URL: "jdbc:postgresql://postgres:5432/observability_admin"
+      ADMIN_DB_JDBC_USER: "postgres"
+      ADMIN_DB_JDBC_PASSWORD: "secret"
+    ports:
+      - "8090:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/healthz >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  app:
+    build:
+      context: ../..
+      dockerfile: examples/1/Dockerfile.app
+    image: observability/example3-app:local
+    environment:
+      OBSERVABILITY_ADMIN_URL: "http://observability-admin:8080"
+      STATE_STORAGE_JDBC_URL: "jdbc:postgresql://postgres:5432/state_storage"
+      STATE_STORAGE_JDBC_USER: "postgres"
+      STATE_STORAGE_JDBC_PASSWORD: "secret"
+      JAVA_TOOL_OPTIONS: "-Dobservability.importer.config.path=/config/importer-config.yaml -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+    ports:
+      - "5005:5005"
+    volumes:
+      - ./importer-config.yaml:/config/importer-config.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      marquez:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  airflow_logs:

@@ -52,7 +52,7 @@ class LineageProcessorTest {
     fun `UPDATE with incident on source notifies target`() {
         val src = table("source")
         val tgt = table("target")
-        stateService.registerChange(src, "null_spike")
+        stateService.registerChange(UUID.randomUUID(), src, "null_spike")
 
         processor.process(lineage(listOf(src), listOf(tgt)))
 
@@ -77,7 +77,7 @@ class LineageProcessorTest {
         val tgt = table("target")
         val child = table("child")
         stateService.link(tgt, child)
-        stateService.registerChange(src, "schema_change")
+        stateService.registerChange(UUID.randomUUID(), src, "schema_change")
 
         processor.process(lineage(listOf(src), listOf(tgt)))
 
@@ -104,7 +104,7 @@ class LineageProcessorTest {
         val oldSrc = table("old_source")
         val tgt = table("target")
         stateService.link(oldSrc, tgt)
-        stateService.registerChange(oldSrc, "freshness_violation")
+        stateService.registerChange(UUID.randomUUID(), oldSrc, "freshness_violation")
         val incident = stateService.getActiveIncidentsRecursively(tgt).single()
 
         val newSrc = table("new_source")
@@ -117,7 +117,7 @@ class LineageProcessorTest {
     fun `REWRITE still links and notifies for new source incidents`() {
         val newSrc = table("new_source")
         val tgt = table("target")
-        stateService.registerChange(newSrc, "null_spike")
+        stateService.registerChange(UUID.randomUUID(), newSrc, "null_spike")
         val incident = stateService.getActiveIncidentsRecursively(newSrc).single()
 
         processor.process(lineage(listOf(newSrc), listOf(tgt), LineageType.REWRITE))
@@ -133,7 +133,7 @@ class LineageProcessorTest {
         val src = table("source")
         val tgt = table("target")
         stateService.link(grandparent, src)
-        stateService.registerChange(grandparent, "volume_anomaly")
+        stateService.registerChange(UUID.randomUUID(), grandparent, "volume_anomaly")
 
         processor.process(lineage(listOf(src), listOf(tgt)))
 
@@ -149,7 +149,7 @@ class LineageProcessorTest {
         val c2 = table("child2")
         stateService.link(tgt, c1)
         stateService.link(c1, c2)
-        stateService.registerChange(src, "schema_change")
+        stateService.registerChange(UUID.randomUUID(), src, "schema_change")
         val incident = stateService.getActiveIncidentsRecursively(src).single()
 
         processor.process(lineage(listOf(src), listOf(tgt)))
@@ -164,7 +164,7 @@ class LineageProcessorTest {
         val ancestor = table("ancestor")
         val tgt = table("target")
         stateService.link(ancestor, tgt)
-        stateService.registerChange(ancestor, "data_drift")
+        stateService.registerChange(UUID.randomUUID(), ancestor, "data_drift")
         val incident = stateService.getActiveIncidentsRecursively(tgt).single()
 
         val newSrc = table("new_source")

@@ -49,9 +49,9 @@ class FakeStateService : StateService {
         return getChildrenRecursively(target)
     }
 
-    override fun registerChange(storageEntity: StorageEntity, changeType: String): List<StorageEntity> {
+    override fun registerChange(incidentId: UUID, storageEntity: StorageEntity, changeType: String): List<StorageEntity> {
         val incident = DataIncident(
-            id = UUID.randomUUID(),
+            id = incidentId,
             data = storageEntity,
             incidentType = changeType,
         )

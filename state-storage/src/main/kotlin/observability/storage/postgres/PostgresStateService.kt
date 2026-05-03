@@ -79,13 +79,13 @@ class PostgresStateService(private val dataSource: DataSource) : StateService {
             childrenOf(conn, t)
         }
 
-    override fun registerChange(storageEntity: StorageEntity, changeType: String): List<StorageEntity> =
+    override fun registerChange(incidentId: UUID, storageEntity: StorageEntity, changeType: String): List<StorageEntity> =
         inTransaction { conn ->
             val entityId = ensureEntityId(conn, storageEntity)
             conn.prepareStatement(
-                "INSERT INTO incident (id, entity_id, change_type) VALUES (?, ?, ?)"
+                "INSERT INTO incident (id, entity_id, change_type) VALUES (?, ?, ?) ON CONFLICT (id) DO NOTHING"
             ).use { ps ->
-                ps.setObject(1, UUID.randomUUID())
+                ps.setObject(1, incidentId)
                 ps.setLong(2, entityId)
                 ps.setString(3, changeType)
                 ps.executeUpdate()
