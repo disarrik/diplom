@@ -1,0 +1,131 @@
+@startuml data-observability-components
+' Use the built-in Smetana layout so Graphviz/dot is not required.
+' Remove this line if you have `brew install graphviz` and prefer dot's layout.
+!pragma layout smetana
+title Data Observability — Component Diagram
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam wrapWidth 200
+skinparam nodesep 60
+skinparam ranksep 70
+
+' Lay out the pipeline left-to-right (Marquez → importer → Kafka → processor → admin → user)
+left to right direction
+
+' ============================================================
+' External systems (declared first so they sit at the edges)
+' ============================================================
+cloud    "Marquez / OpenLineage"              as marquez
+node     "Airflow"                            as airflow
+node     "Dagster"                            as dagster
+database "User's DB\n(target of stat queries)" as userDb
+queue    "Kafka"                              as kafka
+database "PostgreSQL\n(observability state)"  as pgState
+database "PostgreSQL\n(admin state)"          as pgAdmin
+actor    "User"                               as user
+
+' ============================================================
+' Runtimes (real OS processes)
+' ============================================================
+
+node "importer runtime\n(OBSERVABILITY_MODE=importer)" as importerRuntime {
+  package "lineage-importer plugins" <<plugin-bundle>> {
+    [Marquez] <<plugin>> as marquezLI
+  }
+  [Importer] as importer
+  package "incident-detector plugins" <<plugin-bundle>> {
+    [Unique values] <<plugin>> as uniqueDet
+  }
+}
+
+node "processor runtime\n(OBSERVABILITY_MODE=processor)" as processorRuntime {
+  [Processor] as processor
+  package "state-store plugins" <<plugin-bundle>> {
+    [Postgres state store] <<plugin>> as pgStorePlugin
+  }
+}
+
+node "observability-admin runtime" as adminRuntime {
+  package "admin plugins" <<plugin-bundle>> {
+    [Slack]          <<plugin>> as slackP
+    [Jira]           <<plugin>> as jiraP
+    [Mock messenger] <<plugin>> as mockP
+  }
+  [Admin backend\n(HTTP API +\nincident aggregation)] as admin
+  [Web SPA] as webSpa
+}
+
+
+' ============================================================
+' Layout hints (hidden arrows pin the left-to-right pipeline)
+' ============================================================
+marquez          -[hidden]right- importerRuntime
+importerRuntime  -[hidden]right- kafka
+kafka            -[hidden]right- processorRuntime
+processorRuntime -[hidden]right- adminRuntime
+adminRuntime     -[hidden]right- user
+
+' Place the two databases under their respective runtimes
+processorRuntime -[hidden]down- pgState
+adminRuntime     -[hidden]down- pgAdmin
+
+' Orchestrators sit to the right of Marquez and stack vertically
+marquez         -[hidden]right- airflow
+airflow         -[hidden]down-  dagster
+' User's DB stacks under the importer runtime
+importerRuntime -[hidden]down-  userDb
+
+' ============================================================
+' Plugin "loaded into host runtime" relationships
+' ============================================================
+importer  ..> marquezLI     : loads
+importer  ..> uniqueDet     : loads
+processor ..> pgStorePlugin : loads
+admin     ..> slackP        : loads
+admin     ..> jiraP         : loads
+admin     ..> mockP         : loads
+
+' ============================================================
+' Runtime interactions
+' ============================================================
+' Upstream orchestrators publish OpenLineage events to Marquez
+airflow   --> marquez   : OpenLineage events
+dagster   --> marquez   : OpenLineage events
+
+' The importer wakes up on a schedule (cron) and pulls / queries each cycle
+importer  --> marquezLI : invoke\n(on cron)
+importer  --> uniqueDet : invoke\n(on cron)
+
+marquezLI --> marquez   : HTTP\n(pull lineage)
+uniqueDet --> userDb    : JDBC\n(stat query:\nCOUNT DISTINCT ...)
+
+importer  --> kafka     : lineage / incidents
+kafka     --> processor : lineage / incidents
+
+pgStorePlugin --> pgState : JDBC
+processor --> admin     : HTTP notify
+
+admin     --> pgAdmin   : JDBC
+user      --> webSpa
+webSpa    --> admin     : REST
+
+' ============================================================
+' Plugin styling
+' ============================================================
+skinparam component {
+  BackgroundColor<<plugin>> #FFF4C2
+  BorderColor<<plugin>>     #B58900
+}
+skinparam package {
+  BackgroundColor<<plugin-bundle>> #FFFDF0
+  BorderColor<<plugin-bundle>>     #B58900
+  FontColor<<plugin-bundle>>       #6c5300
+}
+
+legend right
+  | <back:#FFF4C2>   </back> | plugin (extension, no own runtime — loaded into a host runtime) |
+  | solid arrow              | runtime call / data flow |
+endlegend
+
+@enduml
