@@ -44,6 +44,9 @@ node "processor runtime\n(OBSERVABILITY_MODE=processor)" as processorRuntime {
   package "state-store plugins" <<plugin-bundle>> {
     [Postgres state store] <<plugin>> as pgStorePlugin
   }
+  package "notify plugins" <<plugin-bundle>> {
+    [HTTP notify] <<plugin>> as httpNotifyP
+  }
 }
 
 node "observability-admin runtime" as adminRuntime {
@@ -82,6 +85,7 @@ importerRuntime -[hidden]down-  userDb
 importer  ..> marquezLI     : loads
 importer  ..> uniqueDet     : loads
 processor ..> pgStorePlugin : loads
+processor ..> httpNotifyP   : loads
 admin     ..> slackP        : loads
 admin     ..> jiraP         : loads
 admin     ..> mockP         : loads
@@ -104,7 +108,7 @@ importer  --> kafka     : lineage / incidents
 kafka     --> processor : lineage / incidents
 
 pgStorePlugin --> pgState : JDBC
-processor --> admin     : HTTP notify
+httpNotifyP   --> admin   : HTTP\n(POST events)
 
 admin     --> pgAdmin   : JDBC
 user      --> webSpa
