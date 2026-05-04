@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Avatar } from './components/Avatar';
 import { Icon } from './components/Icon';
 import { LoginModal } from './components/LoginModal';
@@ -9,20 +9,12 @@ import { IncidentsList } from './pages/IncidentsList';
 import type { Datasource, Incident, Member, PluginDescriptor, Team } from './types';
 import { api } from './api';
 import { clearCreds, getCreds, UnauthorizedError } from './auth';
-
-type Route =
-  | { page: 'incidents' }
-  | { page: 'incident'; id: string }
-  | { page: 'admin-members' }
-  | { page: 'admin-teams' }
-  | { page: 'admin-datasources' };
+import { isAdminRoute, type Route, routeToPath, useRoute } from './lib/router';
 
 const POLL_MS = 5000;
 
-const isAdminRoute = (r: Route) => r.page.startsWith('admin');
-
 export function App() {
-  const [route, setRoute] = useState<Route>({ page: 'incidents' });
+  const { route, navigate } = useRoute();
   const [members, setMembers] = useState<Member[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [datasources, setDatasources] = useState<Datasource[]>([]);
@@ -37,7 +29,7 @@ export function App() {
 
   const requireAuth = (target: Route) => {
     if (authed) {
-      setRoute(target);
+      navigate(target);
     } else {
       setPendingRoute(target);
     }
@@ -47,7 +39,7 @@ export function App() {
     clearCreds();
     setAuthed(false);
     const target: Route = isAdminRoute(route) ? route : { page: 'admin-members' };
-    setRoute({ page: 'incidents' });
+    navigate({ page: 'incidents' });
     setPendingRoute(target);
     showToast('Session expired, please sign in');
   };
@@ -157,9 +149,18 @@ export function App() {
   const signOut = () => {
     clearCreds();
     setAuthed(false);
-    if (isAdminRoute(route)) setRoute({ page: 'incidents' });
+    if (isAdminRoute(route)) navigate({ page: 'incidents' });
     showToast('Signed out');
   };
+
+  useEffect(() => {
+    if (isAdminRoute(route) && !authed) {
+      setPendingRoute(route);
+    }
+    // run once on mount: if a deep-linked admin URL was loaded while signed out,
+    // pop the login modal — closing it will navigate back to /incidents
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="app">
@@ -170,50 +171,52 @@ export function App() {
         </div>
 
         <div className="sidebar__group-label">Operations</div>
-        <button
-          className={`nav-item ${
-            route.page === 'incidents' || route.page === 'incident' ? 'nav-item--active' : ''
-          }`}
-          onClick={() => setRoute({ page: 'incidents' })}
+        <NavLink
+          target={{ page: 'incidents' }}
+          active={route.page === 'incidents' || route.page === 'incident'}
+          onActivate={navigate}
         >
           <span className="nav-item__icon">
             <Icon name="bolt" size={13} />
           </span>
           Incidents
           <span className="nav-item__count">{openIncidents.length}</span>
-        </button>
+        </NavLink>
 
         <div className="sidebar__group-label">Admin</div>
-        <button
-          className={`nav-item ${route.page === 'admin-members' ? 'nav-item--active' : ''}`}
-          onClick={() => requireAuth({ page: 'admin-members' })}
+        <NavLink
+          target={{ page: 'admin-members' }}
+          active={route.page === 'admin-members'}
+          onActivate={requireAuth}
         >
           <span className="nav-item__icon">
             <Icon name="users" size={13} />
           </span>
           Members
           <span className="nav-item__count">{members.length}</span>
-        </button>
-        <button
-          className={`nav-item ${route.page === 'admin-teams' ? 'nav-item--active' : ''}`}
-          onClick={() => requireAuth({ page: 'admin-teams' })}
+        </NavLink>
+        <NavLink
+          target={{ page: 'admin-teams' }}
+          active={route.page === 'admin-teams'}
+          onActivate={requireAuth}
         >
           <span className="nav-item__icon">
             <Icon name="team" size={13} />
           </span>
           Teams
           <span className="nav-item__count">{teams.length}</span>
-        </button>
-        <button
-          className={`nav-item ${route.page === 'admin-datasources' ? 'nav-item--active' : ''}`}
-          onClick={() => requireAuth({ page: 'admin-datasources' })}
+        </NavLink>
+        <NavLink
+          target={{ page: 'admin-datasources' }}
+          active={route.page === 'admin-datasources'}
+          onActivate={requireAuth}
         >
           <span className="nav-item__icon">
             <Icon name="db" size={13} />
           </span>
           Datasources
           <span className="nav-item__count">{datasources.length}</span>
-        </button>
+        </NavLink>
 
         <div className="sidebar__user">
           {authed ? (
@@ -254,9 +257,17 @@ export function App() {
             {route.page === 'incidents' && <strong>Incidents</strong>}
             {route.page === 'incident' && (
               <>
-                <button onClick={() => setRoute({ page: 'incidents' })} style={{ cursor: 'pointer' }}>
+                <a
+                  href={routeToPath({ page: 'incidents' })}
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                    e.preventDefault();
+                    navigate({ page: 'incidents' });
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
                   Incidents
-                </button>
+                </a>
                 <span className="topbar__sep">/</span>
                 <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
                   {currentIncident?.id ?? route.id}
@@ -289,7 +300,7 @@ export function App() {
               datasources={datasources}
               teams={teams}
               members={members}
-              onOpen={(id) => setRoute({ page: 'incident', id })}
+              onOpen={(id) => navigate({ page: 'incident', id })}
             />
           )}
           {route.page === 'incident' && currentIncident && (
@@ -299,7 +310,7 @@ export function App() {
               teams={teams}
               members={members}
               plugins={plugins}
-              onBack={() => setRoute({ page: 'incidents' })}
+              onBack={() => navigate({ page: 'incidents' })}
               onResolve={resolveCurrent}
             />
           )}
@@ -333,10 +344,13 @@ export function App() {
 
       {pendingRoute && (
         <LoginModal
-          onClose={() => setPendingRoute(null)}
+          onClose={() => {
+            if (isAdminRoute(route)) navigate({ page: 'incidents' });
+            setPendingRoute(null);
+          }}
           onSuccess={() => {
             setAuthed(true);
-            setRoute(pendingRoute);
+            navigate(pendingRoute);
             setPendingRoute(null);
             showToast('Signed in');
           }}
@@ -344,5 +358,31 @@ export function App() {
       )}
       {toast && <Toast msg={toast} onDone={() => setToast(null)} />}
     </div>
+  );
+}
+
+function NavLink({
+  target,
+  active,
+  onActivate,
+  children,
+}: {
+  target: Route;
+  active: boolean;
+  onActivate: (target: Route) => void;
+  children: ReactNode;
+}) {
+  return (
+    <a
+      className={`nav-item ${active ? 'nav-item--active' : ''}`}
+      href={routeToPath(target)}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        onActivate(target);
+      }}
+    >
+      {children}
+    </a>
   );
 }
