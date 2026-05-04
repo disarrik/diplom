@@ -13,6 +13,7 @@
             <option value="$PROJECT_DIR$/observability-admin" />
             <option value="$PROJECT_DIR$/state-storage" />
             <option value="$PROJECT_DIR$/std-importer" />
+            <option value="$PROJECT_DIR$/std-notify" />
             <option value="$PROJECT_DIR$/std-processor" />
           </set>
         </option>

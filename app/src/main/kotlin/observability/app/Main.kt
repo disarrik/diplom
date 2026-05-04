@@ -9,6 +9,7 @@ import observability.common.model.DataIncident
 import observability.common.model.StorageEntity
 import observability.common.notify.NotifyService
 import observability.std.importer.TrivialImporter
+import observability.std.notify.HttpNotifyService
 import observability.std.processor.StdIncedentProcessor
 import observability.std.processor.StdLineageProcessor
 import observability.storage.postgres.PostgresStateServiceFactory
