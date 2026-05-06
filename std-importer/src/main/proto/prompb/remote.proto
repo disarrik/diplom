@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package prometheus;
+
+option java_multiple_files = true;
+option java_package = "prometheus";
+
+import "prompb/types.proto";
+
+message WriteRequest {
+  repeated TimeSeries timeseries = 1;
+}

@@ -13,6 +13,7 @@
 #   3000  → marquez web
 #   8080  → airflow webserver
 #   8090  → observability admin UI/API
+#   9090  → prometheus UI/API (also remote-write receiver for app-importer stats)
 #   9092  → kafka (PLAINTEXT)
 #   5005  → app-processor JVM remote debug (JDWP)
 #
@@ -204,6 +205,16 @@ services:
       observability-admin:
         condition: service_started
 
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.enable-remote-write-receiver"
+
   app-importer:
     build:
       context: ../..
@@ -212,6 +223,7 @@ services:
     environment:
       OBSERVABILITY_MODE: "importer"
       KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      PROMETHEUS_QUERY_URL: "http://prometheus:9090"
       JAVA_TOOL_OPTIONS: "-Dobservability.importer.config.path=/config/importer-config.yaml"
     volumes:
       - ./importer-config.yaml:/config/importer-config.yaml:ro
@@ -224,6 +236,8 @@ services:
         condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
+      prometheus:
+        condition: service_started
 
 volumes:
   pgdata:

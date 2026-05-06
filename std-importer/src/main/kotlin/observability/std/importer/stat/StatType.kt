@@ -1,6 +1,5 @@
 package observability.std.importer.stat
 
-data class StatType<T>(
-    val type: Class<T>,
+data class StatType(
     val statTypeId: String,
 )

@@ -1,17 +1,19 @@
 package observability.std.importer.detect.impls
 
 import observability.common.model.DataIncident
+import observability.common.model.StorageEntity
 import observability.common.model.TableStorageEntity
 import observability.std.importer.detect.DetectResult
 import observability.std.importer.detect.IncidentDetector
 import observability.std.importer.stat.Stat
 import observability.std.importer.stat.StatType
+import java.math.BigDecimal
 import java.sql.DriverManager
 import java.util.UUID
 
 class UniqueValuesDetector(
     private val config: Map<String, String>,
-) : IncidentDetector<Long> {
+) : IncidentDetector {
 
     private val connectionString: String get() = config.getValue("connectionString")
     private val password: String get() = config.getValue("password")
@@ -19,18 +21,22 @@ class UniqueValuesDetector(
     private val tableName: String get() = config.getValue("tableName")
     private val columnName: String get() = config.getValue("columnName")
 
-    override fun supports(): StatType<Long> = StatType(
-        Long::class.java,
+    override fun supports(): StatType = StatType(
         "UNIQUE_VALUES_COUNT:${namespace}.${tableName}.${columnName}",
     )
 
-    override fun detect(stats: List<Stat<Long, *>>): DetectResult<Long> {
+    override fun entity(): StorageEntity = TableStorageEntity(
+        namespace = namespace,
+        name = tableName,
+    )
+
+    override fun detect(previous: Stat<*>?): DetectResult {
         val currentCount = queryUniqueCount()
-        val previousCount = stats.lastOrNull()?.value
+        val previousCount = previous?.value?.toLong()
 
         if (previousCount != null && currentCount > previousCount) {
             return DetectResult.IncidentDetected(
-                newStat = currentCount,
+                newStat = BigDecimal.valueOf(currentCount),
                 incident = DataIncident(
                     id = UUID.randomUUID(),
                     data = TableStorageEntity(
@@ -42,7 +48,7 @@ class UniqueValuesDetector(
             )
         }
 
-        return DetectResult.NotDetected(newStat = currentCount)
+        return DetectResult.NotDetected(newStat = BigDecimal.valueOf(currentCount))
     }
 
     private fun queryUniqueCount(): Long {

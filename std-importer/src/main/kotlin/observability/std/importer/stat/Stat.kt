@@ -1,10 +1,11 @@
 package observability.std.importer.stat
 
 import observability.common.model.StorageEntity
+import java.math.BigDecimal
 
-data class Stat<T, E : StorageEntity>(
-    val value: T,
-    val statType: StatType<T>,
+data class Stat<E : StorageEntity>(
+    val value: BigDecimal,
+    val statType: StatType,
     val storageEntity: E,
     val unixTimestamp: Long,
 )

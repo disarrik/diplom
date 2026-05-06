@@ -1,29 +1,26 @@
 package observability.std.importer
 
 import observability.common.importer.Importer
-import observability.common.model.TableStorageEntity
 import observability.common.processor.IncidentProcessor
 import observability.common.processor.LineageProcessor
 import observability.std.importer.detect.DetectResult
 import observability.std.importer.detect.IncidentDetector
 import observability.std.importer.lineage.LineageImporter
 import observability.std.importer.stat.Stat
-import observability.std.importer.storage.InMemoryStatStore
+import observability.std.importer.storage.PrometheusStatStore
 import observability.std.importer.storage.StatStore
 import org.yaml.snakeyaml.Yaml
 import java.nio.file.Files
 import java.nio.file.Paths
-
-private val PLACEHOLDER_ENTITY = TableStorageEntity(namespace = "unknown", name = "unknown")
 
 const val IMPORTER_CONFIG_PATH_PROPERTY = "observability.importer.config.path"
 
 class TrivialImporter : Importer<Unit> {
 
     private val lineageImporters: List<LineageImporter>
-    private val incidentDetectors: List<IncidentDetector<*>>
+    private val incidentDetectors: List<IncidentDetector>
     private val pollIntervalMs: Long
-    private val statStore: StatStore = InMemoryStatStore()
+    private val statStore: StatStore
 
     @Volatile
     private var lineageProcessor: LineageProcessor? = null
@@ -44,8 +41,12 @@ class TrivialImporter : Importer<Unit> {
         }
 
         incidentDetectors = parseEntries(config["incidentDetectors"]).map { (className, params) ->
-            instantiate(className, params) as IncidentDetector<*>
+            instantiate(className, params) as IncidentDetector
         }
+
+        statStore = PrometheusStatStore(
+            prometheusUrl = System.getenv("PROMETHEUS_QUERY_URL") ?: "http://prometheus:9090",
+        )
 
         val thread = Thread(::pollLoop)
         thread.isDaemon = false
@@ -87,22 +88,21 @@ class TrivialImporter : Importer<Unit> {
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun <T> runDetector(detector: IncidentDetector<T>, processor: IncidentProcessor) {
+    private fun runDetector(detector: IncidentDetector, processor: IncidentProcessor) {
         val statType = detector.supports()
-        val history = statStore.history(statType)
-        val result = detector.detect(history)
+        val previous = statStore.lastValue(statType)
+        val result = detector.detect(previous)
 
         statStore.append(
             Stat(
                 value = result.newStat,
                 statType = statType,
-                storageEntity = PLACEHOLDER_ENTITY,
+                storageEntity = detector.entity(),
                 unixTimestamp = System.currentTimeMillis() / 1000,
             )
         )
 
-        if (result is DetectResult.IncidentDetected<T>) {
+        if (result is DetectResult.IncidentDetected) {
             processor.process(result.incident)
         }
     }

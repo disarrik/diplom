@@ -4,7 +4,7 @@ import observability.std.importer.stat.Stat
 import observability.std.importer.stat.StatType
 
 interface StatStore {
-    fun append(stat: Stat<*, *>)
+    fun append(stat: Stat<*>)
 
-    fun <T> history(statType: StatType<T>): List<Stat<T, *>>
+    fun lastValue(statType: StatType): Stat<*>?
 }
