@@ -1,4 +1,4 @@
-package observability.std.importer.stat
+package observability.common.stat
 
 import observability.common.model.StorageEntity
 import java.math.BigDecimal

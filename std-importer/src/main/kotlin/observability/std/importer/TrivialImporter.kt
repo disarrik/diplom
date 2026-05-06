@@ -4,11 +4,10 @@ import observability.common.importer.Importer
 import observability.common.processor.IncidentProcessor
 import observability.common.processor.LineageProcessor
 import observability.std.importer.detect.DetectResult
+import observability.common.stat.Stat
+import observability.common.stat.StatStore
 import observability.std.importer.detect.IncidentDetector
 import observability.std.importer.lineage.LineageImporter
-import observability.std.importer.stat.Stat
-import observability.std.importer.storage.PrometheusStatStore
-import observability.std.importer.storage.StatStore
 import org.yaml.snakeyaml.Yaml
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -44,9 +43,9 @@ class TrivialImporter : Importer<Unit> {
             instantiate(className, params) as IncidentDetector
         }
 
-        statStore = PrometheusStatStore(
-            prometheusUrl = System.getenv("PROMETHEUS_QUERY_URL") ?: "http://prometheus:9090",
-        )
+        val (statStoreClass, statStoreParams) = parseEntry(config["statStore"])
+            ?: error("`statStore` entry is required in importer config")
+        statStore = instantiate(statStoreClass, statStoreParams) as StatStore
 
         val thread = Thread(::pollLoop)
         thread.isDaemon = false
@@ -125,16 +124,20 @@ class TrivialImporter : Importer<Unit> {
                 )
 
         @Suppress("UNCHECKED_CAST")
+        private fun parseEntry(raw: Any?): Pair<String, Map<String, String>>? {
+            val map = raw as? Map<String, Any> ?: return null
+            val className = map["className"] as String
+            val params = (map["params"] as? Map<String, Any>)
+                ?.mapValues { it.value.toString() }
+                ?: emptyMap()
+            return className to params
+        }
+
+        @Suppress("UNCHECKED_CAST")
         private fun parseEntries(raw: Any?): List<Pair<String, Map<String, String>>> {
             if (raw == null) return emptyList()
             val list = raw as? List<Map<String, Any>> ?: return emptyList()
-            return list.map { entry ->
-                val className = entry["className"] as String
-                val params = (entry["params"] as? Map<String, Any>)
-                    ?.mapValues { it.value.toString() }
-                    ?: emptyMap()
-                className to params
-            }
+            return list.mapNotNull { parseEntry(it) }
         }
 
         private fun instantiate(className: String, params: Map<String, String>): Any {

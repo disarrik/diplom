@@ -1,11 +1,11 @@
-package observability.std.importer.storage
+package observability.std.stat.storage
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
 import observability.common.model.FieldStorageEntity
 import observability.common.model.TableStorageEntity
-import observability.std.importer.stat.StatType
+import observability.common.stat.StatType
 import java.math.BigDecimal
 import java.net.InetSocketAddress
 import java.net.URLDecoder

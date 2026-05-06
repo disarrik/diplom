@@ -1,12 +1,12 @@
-package observability.std.importer.storage
+package observability.std.stat.storage
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
 import observability.common.model.FieldStorageEntity
 import observability.common.model.TableStorageEntity
-import observability.std.importer.stat.Stat
-import observability.std.importer.stat.StatType
+import observability.common.stat.Stat
+import observability.common.stat.StatType
 import org.xerial.snappy.Snappy
 import prometheus.WriteRequest
 import java.math.BigDecimal

@@ -15,6 +15,7 @@
             <option value="$PROJECT_DIR$/std-importer" />
             <option value="$PROJECT_DIR$/std-notify" />
             <option value="$PROJECT_DIR$/std-processor" />
+            <option value="$PROJECT_DIR$/std-stat-storage" />
           </set>
         </option>
       </GradleProjectSettings>

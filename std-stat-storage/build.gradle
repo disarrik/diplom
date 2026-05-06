@@ -1,0 +1,40 @@
+plugins {
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.protobuf)
+}
+
+group = 'org.example'
+version = 'unspecified'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation(project(":common"))
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.2'
+    implementation libs.protobuf.kotlin
+    implementation 'org.xerial.snappy:snappy-java:1.1.10.7'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test'
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${libs.versions.protoc.get()}"
+    }
+    generateProtoTasks {
+        all().configureEach {
+            builtins {
+                kotlin {}
+            }
+        }
+    }
+}
+
+kotlin {
+    jvmToolchain(25)
+}
+
+test {
+    useJUnitPlatform()
+}

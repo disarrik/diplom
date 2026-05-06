@@ -14,3 +14,8 @@ incidentDetectors:
       namespace: "postgres"
       tableName: "d1"
       columnName: "status"
+
+statStore:
+  className: observability.std.stat.storage.PrometheusStatStore
+  params:
+    prometheusUrl: "http://prometheus:9090"

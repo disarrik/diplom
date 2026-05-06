@@ -1,8 +1,8 @@
 package observability.std.importer.detect
 
 import observability.common.model.StorageEntity
-import observability.std.importer.stat.Stat
-import observability.std.importer.stat.StatType
+import observability.common.stat.Stat
+import observability.common.stat.StatType
 
 interface IncidentDetector {
     fun supports(): StatType

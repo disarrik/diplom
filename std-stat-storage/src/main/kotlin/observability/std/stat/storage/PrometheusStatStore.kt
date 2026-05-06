@@ -1,12 +1,13 @@
-package observability.std.importer.storage
+package observability.std.stat.storage
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import observability.common.model.FieldStorageEntity
 import observability.common.model.StorageEntity
 import observability.common.model.TableStorageEntity
-import observability.std.importer.stat.Stat
-import observability.std.importer.stat.StatType
+import observability.common.stat.Stat
+import observability.common.stat.StatStore
+import observability.common.stat.StatType
 import org.xerial.snappy.Snappy
 import prometheus.Label
 import prometheus.Sample
@@ -24,6 +25,10 @@ import java.time.Duration
 class PrometheusStatStore(
     private val prometheusUrl: String,
 ) : StatStore {
+
+    constructor(params: Map<String, String>) : this(
+        prometheusUrl = params["prometheusUrl"] ?: "http://prometheus:9090",
+    )
 
     private val httpClient: HttpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(5))

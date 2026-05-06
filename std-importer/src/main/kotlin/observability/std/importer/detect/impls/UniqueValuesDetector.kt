@@ -5,8 +5,8 @@ import observability.common.model.StorageEntity
 import observability.common.model.TableStorageEntity
 import observability.std.importer.detect.DetectResult
 import observability.std.importer.detect.IncidentDetector
-import observability.std.importer.stat.Stat
-import observability.std.importer.stat.StatType
+import observability.common.stat.Stat
+import observability.common.stat.StatType
 import java.math.BigDecimal
 import java.sql.DriverManager
 import java.util.UUID

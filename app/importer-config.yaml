@@ -22,3 +22,8 @@ incidentDetectors:
       namespace: "default"
       tableName: "order"
       columnName: "id"
+
+statStore:
+  className: observability.std.stat.storage.PrometheusStatStore
+  params:
+    prometheusUrl: "http://localhost:9090"

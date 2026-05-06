@@ -173,7 +173,6 @@ services:
       STATE_STORAGE_JDBC_URL: "jdbc:postgresql://postgres:5432/state_storage"
       STATE_STORAGE_JDBC_USER: "postgres"
       STATE_STORAGE_JDBC_PASSWORD: "secret"
-      PROMETHEUS_QUERY_URL: "http://prometheus:9090"
       JAVA_TOOL_OPTIONS: "-Dobservability.importer.config.path=/config/importer-config.yaml -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
     ports:
       - "5005:5005"

@@ -223,7 +223,6 @@ services:
     environment:
       OBSERVABILITY_MODE: "importer"
       KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
-      PROMETHEUS_QUERY_URL: "http://prometheus:9090"
       JAVA_TOOL_OPTIONS: "-Dobservability.importer.config.path=/config/importer-config.yaml"
     volumes:
       - ./importer-config.yaml:/config/importer-config.yaml:ro

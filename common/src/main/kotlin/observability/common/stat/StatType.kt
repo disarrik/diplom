@@ -1,4 +1,4 @@
-package observability.std.importer.stat
+package observability.common.stat
 
 data class StatType(
     val statTypeId: String,

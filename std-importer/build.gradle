@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.protobuf)
 }
 
 group = 'org.example'
@@ -16,21 +15,6 @@ dependencies {
     implementation 'org.yaml:snakeyaml:2.4'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.2'
     implementation 'com.fasterxml.jackson.module:jackson-module-kotlin:2.18.2'
-    implementation libs.protobuf.kotlin
-    implementation 'org.xerial.snappy:snappy-java:1.1.10.7'
-}
-
-protobuf {
-    protoc {
-        artifact = "com.google.protobuf:protoc:${libs.versions.protoc.get()}"
-    }
-    generateProtoTasks {
-        all().configureEach {
-            builtins {
-                kotlin {}
-            }
-        }
-    }
 }
 
 kotlin {
