@@ -4,9 +4,8 @@ import observability.common.model.DataIncident
 import observability.common.model.StorageEntity
 import observability.common.model.TableStorageEntity
 import observability.std.importer.detect.DetectResult
+import observability.std.importer.detect.DetectorStatService
 import observability.std.importer.detect.IncidentDetector
-import observability.common.stat.Stat
-import observability.common.stat.StatType
 import java.math.BigDecimal
 import java.sql.DriverManager
 import java.util.UUID
@@ -21,34 +20,36 @@ class UniqueValuesDetector(
     private val tableName: String get() = config.getValue("tableName")
     private val columnName: String get() = config.getValue("columnName")
 
-    override fun supports(): StatType = StatType(
-        "UNIQUE_VALUES_COUNT:${namespace}.${tableName}.${columnName}",
-    )
-
     override fun entity(): StorageEntity = TableStorageEntity(
         namespace = namespace,
         name = tableName,
     )
 
-    override fun detect(previous: Stat<*>?): DetectResult {
-        val currentCount = queryUniqueCount()
-        val previousCount = previous?.value?.toLong()
+    override fun detect(stats: DetectorStatService): DetectResult {
+        val tags = mapOf(
+            "namespace" to namespace,
+            "table" to tableName,
+            "column" to columnName,
+        )
 
+        val previous = stats.lastValue(SERIES_UNIQUE_VALUES_COUNT, tags)
+        val currentCount = queryUniqueCount()
+        stats.publish(SERIES_UNIQUE_VALUES_COUNT, BigDecimal.valueOf(currentCount), tags)
+
+        val previousCount = previous?.value?.toLong()
         if (previousCount != null && currentCount > previousCount) {
             return DetectResult.IncidentDetected(
-                newStat = BigDecimal.valueOf(currentCount),
-                incident = DataIncident(
-                    id = UUID.randomUUID(),
-                    data = TableStorageEntity(
-                        namespace = namespace,
-                        name = tableName,
-                    ),
-                    incidentType = "UNIQUE_VALUES_INCREASE",
-                ),
+                listOf(
+                    DataIncident(
+                        id = UUID.randomUUID(),
+                        data = TableStorageEntity(namespace = namespace, name = tableName),
+                        incidentType = "UNIQUE_VALUES_INCREASE",
+                    )
+                )
             )
         }
 
-        return DetectResult.NotDetected(newStat = BigDecimal.valueOf(currentCount))
+        return DetectResult.NotDetected
     }
 
     private fun queryUniqueCount(): Long {
@@ -70,4 +71,8 @@ class UniqueValuesDetector(
         qualified.split('.').joinToString(".") { segment ->
             "\"" + segment.replace("\"", "\"\"") + "\""
         }
+
+    companion object {
+        private const val SERIES_UNIQUE_VALUES_COUNT = "unique_values_count"
+    }
 }

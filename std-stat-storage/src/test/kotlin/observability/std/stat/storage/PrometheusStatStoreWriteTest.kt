@@ -3,10 +3,7 @@ package observability.std.stat.storage
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
-import observability.common.model.FieldStorageEntity
-import observability.common.model.TableStorageEntity
-import observability.common.stat.Stat
-import observability.common.stat.StatType
+import observability.common.stat.Metric
 import org.xerial.snappy.Snappy
 import prometheus.WriteRequest
 import java.math.BigDecimal
@@ -15,6 +12,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 
 class PrometheusStatStoreWriteTest {
@@ -37,12 +35,22 @@ class PrometheusStatStoreWriteTest {
     }
 
     @Test
-    fun `append posts remote-write request for table entity`() {
+    fun `append posts remote-write request with arbitrary labels`() {
         val store = PrometheusStatStore(baseUrl)
-        val statType = StatType("UNIQUE_VALUES_COUNT:public.users.email")
-        val entity = TableStorageEntity(namespace = "public", name = "users")
 
-        store.append(Stat(BigDecimal("42"), statType, entity, 1714000000L))
+        store.append(
+            Metric(
+                name = "detector_FooDetector_unique_values_count",
+                labels = mapOf(
+                    "detector_id" to "com.example.FooDetector",
+                    "namespace" to "public",
+                    "table" to "users",
+                    "column" to "email",
+                ),
+                value = BigDecimal("42"),
+                timestampSeconds = 1714000000L,
+            )
+        )
 
         assertEquals("POST", handler.lastMethod)
         assertEquals("/api/v1/write", handler.lastPath)
@@ -55,12 +63,11 @@ class PrometheusStatStoreWriteTest {
         val ts = request.getTimeseries(0)
         assertEquals(
             mapOf(
-                "__name__" to "std_importer_stat_value",
-                "stat_type_id" to statType.statTypeId,
-                "entity_kind" to "table",
+                "__name__" to "detector_FooDetector_unique_values_count",
+                "detector_id" to "com.example.FooDetector",
                 "namespace" to "public",
-                "name" to "users",
-                "field" to "",
+                "table" to "users",
+                "column" to "email",
             ),
             ts.labelsList.associate { it.name to it.value },
         )
@@ -70,24 +77,22 @@ class PrometheusStatStoreWriteTest {
     }
 
     @Test
-    fun `append posts remote-write request for field entity`() {
+    fun `append accepts metric with no extra labels`() {
         val store = PrometheusStatStore(baseUrl)
-        val statType = StatType("X")
-        val entity = FieldStorageEntity(namespace = "ns", name = "t", field = "c")
 
-        store.append(Stat(BigDecimal("7"), statType, entity, 1L))
+        store.append(
+            Metric(
+                name = "bare_metric",
+                labels = emptyMap(),
+                value = BigDecimal("7"),
+                timestampSeconds = 1L,
+            )
+        )
 
         val request = decodeWriteRequest(assertNotNull(handler.lastBody))
         val ts = request.getTimeseries(0)
         assertEquals(
-            mapOf(
-                "__name__" to "std_importer_stat_value",
-                "stat_type_id" to "X",
-                "entity_kind" to "field",
-                "namespace" to "ns",
-                "name" to "t",
-                "field" to "c",
-            ),
+            mapOf("__name__" to "bare_metric"),
             ts.labelsList.associate { it.name to it.value },
         )
         assertEquals(7.0, ts.getSamples(0).value)
@@ -97,11 +102,9 @@ class PrometheusStatStoreWriteTest {
     @Test
     fun `append sends one write per call`() {
         val store = PrometheusStatStore(baseUrl)
-        val statType = StatType("X")
-        val entity = TableStorageEntity("ns", "t")
 
-        store.append(Stat(BigDecimal("1"), statType, entity, 1L))
-        store.append(Stat(BigDecimal("99"), statType, entity, 2L))
+        store.append(Metric("m", emptyMap(), BigDecimal("1"), 1L))
+        store.append(Metric("m", emptyMap(), BigDecimal("99"), 2L))
 
         assertEquals(2, handler.callCount)
         val last = decodeWriteRequest(assertNotNull(handler.lastBody))
@@ -113,11 +116,30 @@ class PrometheusStatStoreWriteTest {
         handler.responseStatus = 500
         val store = PrometheusStatStore(baseUrl)
 
-        store.append(
-            Stat(BigDecimal("1"), StatType("X"), TableStorageEntity("ns", "t"), 1L),
-        )
+        store.append(Metric("m", emptyMap(), BigDecimal("1"), 1L))
 
         assertEquals(1, handler.callCount)
+    }
+
+    @Test
+    fun `append rejects label named __name__`() {
+        val store = PrometheusStatStore(baseUrl)
+
+        assertFailsWith<IllegalArgumentException> {
+            store.append(
+                Metric("m", mapOf("__name__" to "evil"), BigDecimal("1"), 1L),
+            )
+        }
+        assertEquals(0, handler.callCount)
+    }
+
+    @Test
+    fun `append rejects invalid metric name`() {
+        val store = PrometheusStatStore(baseUrl)
+
+        assertFailsWith<IllegalArgumentException> {
+            store.append(Metric("bad-name!", emptyMap(), BigDecimal("1"), 1L))
+        }
     }
 
     private fun decodeWriteRequest(snappyBytes: ByteArray): WriteRequest {

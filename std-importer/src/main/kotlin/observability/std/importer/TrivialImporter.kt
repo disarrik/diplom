@@ -3,9 +3,9 @@ package observability.std.importer
 import observability.common.importer.Importer
 import observability.common.processor.IncidentProcessor
 import observability.common.processor.LineageProcessor
-import observability.std.importer.detect.DetectResult
-import observability.common.stat.Stat
 import observability.common.stat.StatStore
+import observability.std.importer.detect.BackboneDetectorStatService
+import observability.std.importer.detect.DetectResult
 import observability.std.importer.detect.IncidentDetector
 import observability.std.importer.lineage.LineageImporter
 import org.yaml.snakeyaml.Yaml
@@ -88,21 +88,11 @@ class TrivialImporter : Importer<Unit> {
     }
 
     private fun runDetector(detector: IncidentDetector, processor: IncidentProcessor) {
-        val statType = detector.supports()
-        val previous = statStore.lastValue(statType)
-        val result = detector.detect(previous)
-
-        statStore.append(
-            Stat(
-                value = result.newStat,
-                statType = statType,
-                storageEntity = detector.entity(),
-                unixTimestamp = System.currentTimeMillis() / 1000,
-            )
-        )
-
-        if (result is DetectResult.IncidentDetected) {
-            processor.process(result.incident)
+        val detectorId = detector::class.qualifiedName ?: detector::class.java.name
+        val stats = BackboneDetectorStatService(statStore, detectorId)
+        when (val result = detector.detect(stats)) {
+            is DetectResult.IncidentDetected -> result.incidents.forEach(processor::process)
+            DetectResult.NotDetected -> Unit
         }
     }
 

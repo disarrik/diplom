@@ -18,6 +18,8 @@ Postgres (postgres-demo)  ──▶  Airflow DAG  ──▶  order_dwh
 | Airflow           | http://localhost:8080    | admin / admin   |
 | Marquez UI        | http://localhost:3000    | —               |
 | Admin Panel       | http://localhost:8090    | admin / admin   |
+| Grafana           | http://localhost:3001    | admin / admin (или anonymous Viewer) |
+| Prometheus        | http://localhost:9090    | —               |
 | PostgreSQL        | localhost:**15432**       | postgres / secret |
 
 ## Запуск кластера
@@ -60,6 +62,20 @@ SELECT COUNT(DISTINCT "status") FROM "order";
 
 В базе три заказа с допустимыми статусами (`pending`, `processing`, `completed`),
 поэтому счётчик уникальных значений стабилен — инцидентов нет.
+
+## Просмотр метрик в Grafana
+
+Откройте http://localhost:3001 — Grafana автоматически подхватит источник
+данных Prometheus и преднастроенный дашборд **Detector Metrics**. На дашборде:
+
+- **Detector series over time** — все таймсерии, опубликованные детекторами
+  (`{__name__=~"detector_.*"}`), с фильтрами по `detector_id` и имени метрики.
+- **Latest value per series** — таблица последних значений за 5 минут с
+  разбивкой по тегам `namespace` / `table` / `column`.
+
+Для `UniqueValuesDetector` метрика называется
+`detector_observability_std_importer_detect_impls_UniqueValuesDetector_unique_values_count`
+и имеет теги `detector_id`, `namespace`, `table`, `column`.
 
 ## Имитация порчи данных
 

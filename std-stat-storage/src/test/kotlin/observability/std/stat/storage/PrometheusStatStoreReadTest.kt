@@ -3,9 +3,6 @@ package observability.std.stat.storage
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
-import observability.common.model.FieldStorageEntity
-import observability.common.model.TableStorageEntity
-import observability.common.stat.StatType
 import java.math.BigDecimal
 import java.net.InetSocketAddress
 import java.net.URLDecoder
@@ -14,7 +11,6 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PrometheusStatStoreReadTest {
@@ -37,7 +33,7 @@ class PrometheusStatStoreReadTest {
     }
 
     @Test
-    fun `lastValue parses success response with table entity`() {
+    fun `query parses success response and exposes labels minus __name__`() {
         handler.responseBody = """
             {
               "status": "success",
@@ -46,12 +42,11 @@ class PrometheusStatStoreReadTest {
                 "result": [
                   {
                     "metric": {
-                      "__name__": "std_importer_stat_value",
-                      "stat_type_id": "UNIQUE_VALUES_COUNT:public.users.email",
-                      "entity_kind": "table",
+                      "__name__": "detector_FooDetector_unique_values_count",
+                      "detector_id": "com.example.FooDetector",
                       "namespace": "public",
-                      "name": "users",
-                      "field": ""
+                      "table": "users",
+                      "column": "email"
                     },
                     "value": [1714000000.5, "42"]
                   }
@@ -61,84 +56,101 @@ class PrometheusStatStoreReadTest {
         """.trimIndent()
 
         val store = PrometheusStatStore(baseUrl)
-        val statType = StatType("UNIQUE_VALUES_COUNT:public.users.email")
 
-        val stat = store.lastValue(statType)
+        val samples = store.query(
+            metricName = "detector_FooDetector_unique_values_count",
+            labelFilters = mapOf("detector_id" to "com.example.FooDetector"),
+            lookbackSeconds = 600,
+        )
 
-        assertEquals(BigDecimal("42"), stat?.value)
-        assertEquals(1714000000L, stat?.unixTimestamp)
-        assertEquals(statType, stat?.statType)
-        assertEquals(TableStorageEntity("public", "users"), stat?.storageEntity)
+        assertEquals(1, samples.size)
+        val sample = samples.single()
+        assertEquals(BigDecimal("42"), sample.value)
+        assertEquals(1714000000L, sample.timestampSeconds)
+        assertEquals(
+            mapOf(
+                "detector_id" to "com.example.FooDetector",
+                "namespace" to "public",
+                "table" to "users",
+                "column" to "email",
+            ),
+            sample.labels,
+        )
 
-        val expectedQuery = "last_over_time(std_importer_stat_value{stat_type_id=\"${statType.statTypeId}\"}[10m])"
+        val expectedQuery = "last_over_time(detector_FooDetector_unique_values_count" +
+            "{detector_id=\"com.example.FooDetector\"}[600s])"
         assertEquals(expectedQuery, handler.lastQuery)
     }
 
     @Test
-    fun `lastValue parses field entity`() {
+    fun `query returns all results in vector`() {
         handler.responseBody = """
             {
               "status": "success",
               "data": {
                 "resultType": "vector",
                 "result": [
-                  {
-                    "metric": {
-                      "entity_kind": "field",
-                      "namespace": "ns",
-                      "name": "t",
-                      "field": "c"
-                    },
-                    "value": [1.0, "5"]
-                  }
+                  {"metric": {"__name__": "m", "k": "a"}, "value": [1.0, "1"]},
+                  {"metric": {"__name__": "m", "k": "b"}, "value": [2.0, "2"]}
                 ]
               }
             }
         """.trimIndent()
 
         val store = PrometheusStatStore(baseUrl)
-        val stat = store.lastValue(StatType("X"))
+        val samples = store.query("m", emptyMap(), 60)
 
-        assertEquals(FieldStorageEntity("ns", "t", "c"), stat?.storageEntity)
+        assertEquals(2, samples.size)
+        assertEquals(setOf("a", "b"), samples.mapNotNull { it.labels["k"] }.toSet())
     }
 
     @Test
-    fun `lastValue returns null when result array is empty`() {
+    fun `query returns empty list when result array is empty`() {
         handler.responseBody = """
             {"status":"success","data":{"resultType":"vector","result":[]}}
         """.trimIndent()
 
         val store = PrometheusStatStore(baseUrl)
-        assertNull(store.lastValue(StatType("X")))
+        assertEquals(emptyList(), store.query("m", emptyMap(), 60))
     }
 
     @Test
-    fun `lastValue returns null on non-success status`() {
+    fun `query returns empty list on non-success status`() {
         handler.responseBody = """
             {"status":"error","errorType":"bad_data","error":"boom"}
         """.trimIndent()
 
         val store = PrometheusStatStore(baseUrl)
-        assertNull(store.lastValue(StatType("X")))
+        assertEquals(emptyList(), store.query("m", emptyMap(), 60))
     }
 
     @Test
-    fun `lastValue returns null on http 500`() {
+    fun `query returns empty list on http 500`() {
         handler.responseStatus = 500
         handler.responseBody = "internal error"
 
         val store = PrometheusStatStore(baseUrl)
-        assertNull(store.lastValue(StatType("X")))
+        assertEquals(emptyList(), store.query("m", emptyMap(), 60))
     }
 
     @Test
-    fun `lastValue escapes label values with quotes`() {
+    fun `query escapes label values with quotes and backslashes`() {
         handler.responseBody = """{"status":"success","data":{"resultType":"vector","result":[]}}"""
 
         val store = PrometheusStatStore(baseUrl)
-        store.lastValue(StatType("weird\"id"))
+        store.query("m", mapOf("k" to "weird\"\\id"), 60)
 
-        assertTrue(handler.lastQuery!!.contains("stat_type_id=\"weird\\\"id\""))
+        assertTrue(handler.lastQuery!!.contains("k=\"weird\\\"\\\\id\""))
+    }
+
+    @Test
+    fun `query omits selector braces when no filters`() {
+        handler.responseBody = """{"status":"success","data":{"resultType":"vector","result":[]}}"""
+
+        val store = PrometheusStatStore(baseUrl)
+        store.query("m", emptyMap(), 60)
+
+        assertEquals("last_over_time(m[60s])", handler.lastQuery)
     }
 
     private class RecordingHandler : HttpHandler {

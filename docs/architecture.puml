@@ -21,6 +21,7 @@ node     "Airflow"                            as airflow
 node     "Dagster"                            as dagster
 database "User's DB\n(target of stat queries)" as userDb
 queue    "Kafka"                              as kafka
+database "Prometheus\n(stat time-series)"     as prometheus
 database "PostgreSQL\n(observability state)"  as pgState
 database "PostgreSQL\n(admin state)"          as pgAdmin
 actor    "User"                               as user
@@ -36,6 +37,9 @@ node "importer runtime\n(OBSERVABILITY_MODE=importer)" as importerRuntime {
   [Importer] as importer
   package "incident-detector plugins" <<plugin-bundle>> {
     [Unique values] <<plugin>> as uniqueDet
+  }
+  package "stat-storage plugins" <<plugin-bundle>> {
+    [Prometheus stat store] <<plugin>> as promStorePlugin
   }
 }
 
@@ -78,14 +82,16 @@ marquez         -[hidden]right- airflow
 airflow         -[hidden]down-  dagster
 ' User's DB stacks under the importer runtime
 importerRuntime -[hidden]down-  userDb
+userDb          -[hidden]down-  prometheus
 
 ' ============================================================
 ' Plugin "loaded into host runtime" relationships
 ' ============================================================
-importer  ..> marquezLI     : loads
-importer  ..> uniqueDet     : loads
-processor ..> pgStorePlugin : loads
-processor ..> httpNotifyP   : loads
+importer  ..> marquezLI       : loads
+importer  ..> uniqueDet       : loads
+importer  ..> promStorePlugin : loads
+processor ..> pgStorePlugin   : loads
+processor ..> httpNotifyP     : loads
 admin     ..> slackP        : loads
 admin     ..> jiraP         : loads
 admin     ..> mockP         : loads
@@ -103,6 +109,10 @@ importer  --> uniqueDet : invoke\n(on cron)
 
 marquezLI --> marquez   : HTTP\n(pull lineage)
 uniqueDet --> userDb    : JDBC\n(stat query:\nCOUNT DISTINCT ...)
+
+' Detectors read previous values and append new stat values via the stat-storage plugin
+uniqueDet       --> promStorePlugin : lastValue / append\n(stat history)
+promStorePlugin --> prometheus      : HTTP remote-write /\nPromQL query
 
 importer  --> kafka     : lineage / incidents
 kafka     --> processor : lineage / incidents

@@ -36,6 +36,8 @@ IncidentConsumerLoop → StdIncedentProcessor ─┤  state: PostgresStateServic
 | Airflow           | http://localhost:8080    | admin / admin     |
 | Marquez UI        | http://localhost:3000    | —                 |
 | Admin Panel       | http://localhost:8090    | admin / admin     |
+| Grafana           | http://localhost:3001    | admin / admin (или anonymous Viewer) |
+| Prometheus        | http://localhost:9090    | —                 |
 | PostgreSQL        | localhost:**15432**      | postgres / secret |
 | Kafka (PLAINTEXT) | localhost:**9092**       | —                 |
 
@@ -95,6 +97,8 @@ docker compose -f examples/2/docker-compose.yaml up -d --scale app-importer=3
 - DAG'и Airflow и init-скрипты Postgres скопированы в `examples/2/airflow` и
   `examples/2/postgres` (compose монтирует их через bind-mount).
 - `importer-config.yaml` идентичен примеру 1.
+- Grafana с дашбордом **Detector Metrics** доступна на http://localhost:3001 —
+  preset берётся из `examples/1/grafana/`.
 
 ## Топики
 

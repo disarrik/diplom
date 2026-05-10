@@ -35,6 +35,8 @@ Postgres (postgres-demo)
 | Airflow           | http://localhost:8080    | admin / admin     |
 | Marquez UI        | http://localhost:3000    | —                 |
 | Admin Panel       | http://localhost:8090    | admin / admin     |
+| Grafana           | http://localhost:3001    | admin / admin (или anonymous Viewer) |
+| Prometheus        | http://localhost:9090    | —                 |
 | PostgreSQL        | localhost:**15432**      | postgres / secret |
 
 ## Запуск кластера
@@ -107,6 +109,13 @@ VALUES ('Evil Corp', 9999.99, 'unknown');
 при обработке нового lineage-события процессор вызывает
 `getActiveIncidentsRecursively(source)` и для каждого активного инцидента
 уведомляет таргет и всех его потомков.
+
+## Метрики детекторов в Grafana
+
+http://localhost:3001 — дашборд **Detector Metrics** (preset из
+`examples/1/grafana/`). На графике видно, как `unique_values_count` для `d1`
+растёт с 3 до 4 в момент шага 2; теги `namespace` / `table` / `column`
+позволяют фильтровать по конкретному датасорсу.
 
 ## Завершение
 
