@@ -78,7 +78,7 @@ psql -h localhost -p 15432 -U postgres -d postgres-demo
 ```
 
 ```sql
-INSERT INTO d1 (customer_name, amount, status)
+INSERT INTO "order" (customer_name, amount, status)
 VALUES ('Evil Corp', 9999.99, 'unknown');
 ```
 
